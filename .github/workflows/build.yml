@@ -25,4 +25,3 @@ jobs:
       with:
         name: unlocker-exe
         path: unlocker.exe
-
