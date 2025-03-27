@@ -12,16 +12,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: List all project files (PowerShell)
-      run: Get-ChildItem -Recurse -File | Select-Object FullName
-
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Compile unlocker.exe
-      run: cl /EHsc /Fe:unlocker.exe src/main.cpp
+    - name: Assemble syscall.asm with ml64
+      run: ml64 /c /Fo:syscall.obj syscall.asm
 
-    - name: Upload .exe
+    - name: Compile main.cpp and link with syscall.obj
+      run: cl /EHsc /Fe:unlocker.exe src\main.cpp syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
+
+    - name: Upload unlocker.exe
       uses: actions/upload-artifact@v4
       with:
         name: unlocker-exe
