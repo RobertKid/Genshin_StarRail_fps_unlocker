@@ -12,14 +12,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Show files (for debugging)
-      run: dir /s /b
+    - name: List all project files (PowerShell)
+      run: Get-ChildItem -Recurse -File | Select-Object FullName
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Build unlocker.exe
-      run: cl /EHsc /Fe:unlocker.exe src\main.cpp
+    - name: Compile unlocker.exe
+      run: cl /EHsc /Fe:unlocker.exe src/main.cpp
 
     - name: Upload .exe
       uses: actions/upload-artifact@v4
