@@ -1,1 +1,28 @@
+name: Build unlocker.exe
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up MSVC (Microsoft C++ compiler)
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Compile main.cpp into unlocker.exe
+      run: cl /EHsc /Fe:unlocker.exe main.cpp
+
+    - name: Upload unlocker.exe as downloadable artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: unlocker-exe
+        path: unlocker.exe
 
