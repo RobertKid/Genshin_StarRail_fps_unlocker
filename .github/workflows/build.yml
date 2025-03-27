@@ -15,16 +15,16 @@ jobs:
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Assemble syscall.asm with ml64
-      run: ml64 /c /Fo:syscall.obj syscall.asm
-      working-directory: ${{ github.workspace }}
+    - name: Assemble syscall.asm with ml
+      run: ml /c /Fo:syscall.obj syscall.asm
+      working-directory: ${{ github.workspace }}/Genshin_StarRail_fps_unlocker
 
-    - name: Compile main.cpp and link with syscall.obj
+    - name: Compile and link unlocker.exe
       run: cl /EHsc /Fe:unlocker.exe src\main.cpp syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
-      working-directory: ${{ github.workspace }}
+      working-directory: ${{ github.workspace }}/Genshin_StarRail_fps_unlocker
 
     - name: Upload unlocker.exe
       uses: actions/upload-artifact@v4
       with:
         name: unlocker-exe
-        path: unlocker.exe
+        path: Genshin_StarRail_fps_unlocker/unlocker.exe
