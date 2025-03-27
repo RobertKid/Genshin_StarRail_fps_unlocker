@@ -16,11 +16,11 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Assemble syscall.asm with ml64
-      run: ml64 /c /Fo:syscall.obj src\syscall.asm
+      run: ml64 /c /Fo:src\syscall.obj src\syscall.asm
       working-directory: ${{ github.workspace }}
 
     - name: Compile and link unlocker.exe
-      run: cl /EHsc /Fe:unlocker.exe src\main.cpp syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
+      run: cl /EHsc /Fe:unlocker.exe src\main.cpp src\syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
       working-directory: ${{ github.workspace }}
 
     - name: Upload unlocker.exe
