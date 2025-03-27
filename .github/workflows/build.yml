@@ -12,14 +12,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Set working directory
+      run: dir
+      working-directory: ${{ github.workspace }}
+
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Assemble syscall.asm with ml64
-      run: ml64 /c /Fo:syscall.obj .\syscall.asm
+      run: ml64 /c /Fo:syscall.obj syscall.asm
+      working-directory: ${{ github.workspace }}
 
     - name: Compile main.cpp and link with syscall.obj
       run: cl /EHsc /Fe:unlocker.exe src\main.cpp syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
+      working-directory: ${{ github.workspace }}
 
     - name: Upload unlocker.exe
       uses: actions/upload-artifact@v4
