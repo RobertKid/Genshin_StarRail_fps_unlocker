@@ -1,7 +1,3 @@
-.386
-.model flat, C
-.stack 100h
-.data
 .code
 	ALIGN 16
 	asm_syscall proc
