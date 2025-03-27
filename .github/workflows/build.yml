@@ -15,8 +15,8 @@ jobs:
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Assemble syscall.asm with ml
-      run: ml64 /c /Fo:syscall.obj syscall.asm
+    - name: Assemble syscall.asm with ml64
+      run: ml64 /c /Fo:syscall.obj src\syscall.asm
       working-directory: ${{ github.workspace }}
 
     - name: Compile and link unlocker.exe
