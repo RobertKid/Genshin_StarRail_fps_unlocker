@@ -1,21 +1,21 @@
 .code
 asm_syscall proc
-    db 048h
+    db 48h
     push [rcx + 8h]
     mov r10, [rcx + 10h]
-    dd 0498B48h
+    dd 498B48h
     db 44h
     lea rax, callreturn
     push rax
     mov rax, rsp
-    lea rsp, [rsp-0680h]
+    lea rsp, [rsp-680h]
     xchg [rsp], rbp
     sub rsp, 8h
     mov [rsp], rax
-    lea rsp, [rsp-0120h]
+    lea rsp, [rsp-120h]
     push [rax]
     mov [rax], ebp
-    lea rax, [rax+08h]
+    lea rax, [rax+8h]
     movups xmm0, [rax+30h]
     movups [rsp+28h], xmm0
     movups xmm0, [rax+40h]
@@ -35,13 +35,13 @@ asm_syscall proc
     dq 0CCCCCCCCCCCCCCCCh
 
 callreturn:
-    lea rsp, [rsp-01000h]
-    lea rsp, [rsp-01000h]
-    lea rsp, [rsp+02120h]
+    lea rsp, [rsp-1000h]
+    lea rsp, [rsp-1000h]
+    lea rsp, [rsp+2120h]
     xchg [rsp], rax
     xchg rsp, rax
-    mov rbp, [rax+08h]
-    dd 0408B48h
+    mov rbp, [rax+8h]
+    dd 408B48h
     add rsp, 10h
     ret
     int 3h
