@@ -1,28 +1,42 @@
-name: Build C++ Code on Windows
+name: Build unlocker.exe
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up MSVC
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Compile with MSVC
-      shell: cmd
-      run: cl /EHsc /Fe:myprogram.exe main.cpp
+      - name: Assemble syscall.asm with ml64
+        shell: cmd
+        run: |
+          ml64 /c /Fo:syscall.obj src\syscall.asm
+          echo "Listing files in src directory:"
+          dir /s /b src
+        working-directory: ${{ github.workspace }}
 
-    - name: Upload myprogram.exe
-      uses: actions/upload-artifact@v4
-      with:
-        name: myprogram-exe
-        path: myprogram.exe
+      - name: Compile and link unlocker.exe
+        shell: cmd
+        run: |
+          cl /EHsc /Fe:unlocker.exe vscode\main.cpp src\syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
+          echo "Listing files in repository root:"
+          dir /s /b
+        working-directory: ${{ github.workspace }}
+
+      - name: Upload unlocker.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: unlocker-exe
+          path: unlocker.exe
