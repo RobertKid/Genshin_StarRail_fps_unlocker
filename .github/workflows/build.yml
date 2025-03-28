@@ -11,15 +11,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 检出仓库代码
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. 设置 MSVC (Visual Studio) 编译环境
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      # 3. 编译 syscall.asm -> syscall.obj
       - name: Assemble syscall.asm with ml64
         shell: cmd
         run: |
@@ -28,7 +25,6 @@ jobs:
           dir /s /b src
         working-directory: ${{ github.workspace }}
 
-      # 4. 编译并链接 main.cpp + syscall.obj -> unlocker.exe
       - name: Compile and link unlocker.exe
         shell: cmd
         run: |
@@ -37,8 +33,7 @@ jobs:
           dir /s /b
         working-directory: ${{ github.workspace }}
 
-      # 5. 上传生成的 unlocker.exe 供下载
-      - name: Upload unlocker.exe
+      - name: Upload unlocker.exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: unlocker-exe
