@@ -2,11 +2,9 @@ name: Build unlocker.exe
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
@@ -19,24 +17,18 @@ jobs:
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Assemble syscall.asm with ml64
+      - name: Compile with MSVC
         shell: cmd
-        run: |
-          ml64 /c /Fo:syscall.obj src\syscall.asm
-          echo "Listing files in src directory:"
-          dir /s /b src
+        run: cl /EHsc /Fe:unlocker.exe vscode\main.cpp
         working-directory: ${{ github.workspace }}
 
-      - name: Compile and link unlocker.exe
+      - name: List files after linking
         shell: cmd
-        run: |
-          cl /EHsc /Fe:unlocker.exe vscode\main.cpp src\syscall.obj user32.lib shell32.lib kernel32.lib advapi32.lib
-          echo "Listing files in repository root:"
-          dir /s /b
+        run: dir /s /b
         working-directory: ${{ github.workspace }}
 
-      - name: Upload unlocker.exe
+      - name: Upload unlocker.exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: unlocker-exe
-          path: unlocker.exe
+          path: '**/unlocker.exe'
