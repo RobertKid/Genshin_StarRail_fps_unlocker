@@ -420,54 +420,6 @@ const DECLSPEC_ALIGN(32) BYTE _shellcode_Const[] =
         0xCC,
         0xCC,
         // int3
-        0x48,
-        0x83,
-        0xEC,
-        0x28, // sub rsp, 0x28                        //Show Errormsg and closehandle
-        0x44,
-        0x44,
-        0x89,
-        0xF9, // mov ecx, r15d
-        0xFF,
-        0x15,
-        0xFA,
-        0xFE,
-        0xFF,
-        0xFF, // call [API_CloseHandle]
-        0x31,
-        0xC9, // xor ecx, ecx
-        0x48,
-        0x8D,
-        0x15,
-        0x19,
-        0x00,
-        0x00,
-        0x00, // lea rdx, qword:["Sync failed!"]
-        0x4C,
-        0x8D,
-        0x05,
-        0x22,
-        0x00,
-        0x00,
-        0x00, // lea r8, qword:["Error"]
-        0x41,
-        0xB9,
-        0x10,
-        0x00,
-        0x00,
-        0x00, // mov r9d, 0x10
-        0xFF,
-        0x15,
-        0xD6,
-        0xFE,
-        0xFF,
-        0xFF, // call [API_MessageBoxA]
-        0x48,
-        0x83,
-        0xC4,
-        0x28, // add rsp, 0x28
-        0xC3, // ret
-        // int3
         0xCC,
         'S',
         'y',
