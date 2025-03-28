@@ -4,26 +4,23 @@
 #define KEY_DECREASE VK_DOWN
 #define KEY_DECREASE_SMALL VK_LEFT
 #define FPS_TARGET 120
-#define DEFAULT_DEVICE 2
+#define DEFAULT_DEVICE 8 
 #define CONFIG_FILENAME (L"hoyofps_config.ini")
-#define IsKeyPressed(nVirtKey) ((GetKeyState(nVirtKey) & (1 << (sizeof(SHORT) * 8 - 1))) != 0)
+#define IsKeyPressed(nVirtKey)    ((GetKeyState(nVirtKey) & (1<<(sizeof(SHORT)*8-1))) != 0)
 
 #include <iostream>
 #include <vector>
 #include <string>
 #include <locale.h>
 #include <intrin.h>
+#include "NTSYSAPI.h"
 
 #include <Windows.h>
 #include <TlHelp32.h>
 
-#pragma comment(lib, "User32.lib")
-#pragma comment(lib, "Shell32.lib")
-#pragma comment(lib, "Advapi32.lib")
-
 #include "fastmemcp.h"
-#include "NTSYSAPI.h"
 #include "inireader.h"
+
 
 #ifndef _WIN64
 #error you must build in Win x64
@@ -31,7 +28,6 @@
 
 using namespace std;
 
-BYTE *_G_shellcode_buffer = 0;
 
 wstring HKSRGamePath{};
 wstring GenGamePath{};
@@ -43,7 +39,7 @@ uint32_t Target_set_30 = 60;
 BYTE isGenshin = 1;
 bool Use_mobile_UI = 0;
 bool _main_state = 1;
-BYTE Process_endstate = 0;
+BYTE Process_endstate = 0; 
 bool ErrorMsg_EN = 1;
 bool isHook = 0;
 bool is_old_version = 0;
@@ -52,889 +48,241 @@ HWND _console_HWND = 0;
 BYTE ConfigPriorityClass = 1;
 uint32_t GamePriorityClass = NORMAL_PRIORITY_CLASS;
 
-const uint32_t sc_entryVA = 0x1C0;
+
 const DECLSPEC_ALIGN(32) BYTE _shellcode_Const[] =
-    {
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint32_t unlocker_pid              _shellcode_[0]
-        0x20,
-        0xDF,
-        0x2F,
-        0x67, // uint32_t timestamp                 _shellcode_[4]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t unlocker_FpsValue_addr    _shellcode_[8]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t Ptr_il2cpp_fps            _shellcode_[0x10]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t Ptr_Engine_fps            _shellcode_[0x18]
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint32_t hksr_ui_rva               _shellcode_[0x20]
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint32_t hksr_ui_type              _shellcode_[0x24]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t NULL                      _shellcode_[0x28]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t NULL                      _shellcode_[0x30]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t Ptr_Function_link         _shellcode_[0x38]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_OpenProcess           _shellcode_[0x40]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_ReadProcessmem        _shellcode_[0x48]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_Sleep                 _shellcode_[0x50]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_GetModuleHandleA      _shellcode_[0x58]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_MessageBoxA           _shellcode_[0x60]
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // uint64_t API_CloseHandle           _shellcode_[0x68]
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC, // 0x70
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC, // 0x78
-        // int3
-        0x48,
-        0x83,
-        0xEC,
-        0x38, // sub rsp,0x38                       //sync_start
-        0x48,
-        0x8D,
-        0xAC,
-        0x24,
-        0x40,
-        0x00,
-        0x00,
-        0x00, // lea rbp, [rsp+0x40]
-        0x41,
-        0x89,
-        0xC8, // mov r8d, ecx
-        0x33,
-        0xD2, // xor edx, edx
-        0xB9,
-        0xFF,
-        0xFF,
-        0x1F,
-        0x00, // mov ecx,1FFFFF
-        0xFF,
-        0x15,
-        0xA4,
-        0xFF,
-        0xFF,
-        0xFF, // call [API_OpenProcess]
-        0x85,
-        0xC0, // test eax, eax
-        0x74,
-        0x68, // jz return
-        0x2E,
-        0x41,
-        0x89,
-        0xC7, // mov r15d, eax
-        0x44,
-        0x48,
-        0x8B,
-        0x3D,
-        0x5C,
-        0xFF,
-        0xFF,
-        0xFF, // mov rdi, qword[unlocker_FpsValue_addr]
-        0x4D,
-        0x31,
-        0xF6, // xor r14, r14
-        0xBB,
-        0xF4,
-        0x01,
-        0x00,
-        0x00, // mov ebx, 0x1F4        (500ms)
-        0x44,
-        0x48,
-        0x8D,
-        0x35,
-        0x04,
-        0x00,
-        0x00,
-        0x00, // lea rsi, qword:[Read_tar_fps]
-        0x89,
-        0x5C,
-        0x24,
-        0x28, // mov dword:[RSP+0x28], ebx
-        // Read_tar_fps
-        0x4C,
-        0x8D,
-        0x44,
-        0x24,
-        0x28, // lea r8, qword:[RSP+0x28]
-        0x4C,
-        0x89,
-        0x74,
-        0x24,
-        0x20, // mov qword ptr ss:[rsp+20],r14
-        0x41,
-        0xB9,
-        0x04,
-        0x00,
-        0x00,
-        0x00, // mov r9d, 0x4
-        0x48,
-        0x89,
-        0xFA, // mov rdx, rdi
-        0x44,
-        0x89,
-        0xF9, // mov ecx, esi
-        0xFF,
-        0x15,
-        0x6C,
-        0xFF,
-        0xFF,
-        0xFF, // call [API_ReadProcessmem]
-        0x85,
-        0xC0, // test eax, eax
-        0x75,
-        0x10, // jnz continue
-        // read fail
-        0x48,
-        0x83,
-        0xC6,
-        0x30, // add r15, 0x30         //控制循环范围
-        0x66,
-        0x0F,
-        0x1F,
-        0x44,
-        0x00,
-        0x00, // nop
-        0x48,
-        0xE8,
-        0x70,
-        0x00,
-        0x00,
-        0x00, // call Show Errormsg and CloseHandle
-        // continue
-        0x8B,
-        0x4C,
-        0x24,
-        0x28, // mov ecx, qword:[RSP+0x28]
-        0x48,
-        0xE8,
-        0x16,
-        0x00,
-        0x00,
-        0x00, // call Sync_auto
-        0x89,
-        0xD9, // mov ecx, ebx
-        0xFF,
-        0x15,
-        0x4E,
-        0xFF,
-        0xFF,
-        0xFF, // call [API_Sleep]
-        0xFF,
-        0xE6, // jmp rsi
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        // return
-        0x48,
-        0x83,
-        0xC4,
-        0x38, // add rsp,0x38
-        0xC3, // ret
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        // int3
-        0x44,
-        0x48,
-        0x8B,
-        0x05,
-        0xF8,
-        0xFE,
-        0xFF,
-        0xFF, // mov  rax, qword ptr ds:[il2cpp_fps]
-        0x48,
-        0x85,
-        0xC0, // test rax, rax
-        0x74,
-        0x1B, // jz Write
-        // read_game_set
-        0x2E,
-        0x8B,
-        0x00, // mov eax, qword ptr ss:[rax]
-        0x83,
-        0xF8,
-        0x1E, // cmp eax, 0x1E
-        0x74,
-        0x0D, // je set 60
-        0x83,
-        0xF8,
-        0x2D, // cmp eax, 0x2D
-        0x74,
-        0x0E, // je Sync_unlocker
-        0x2E,
-        0xB9,
-        0xE8,
-        0x03,
-        0x00,
-        0x00, // mov ecx, 0x3E8
-        0xEB,
-        0x06, // jmp Write
-        0x2E,
-        0xB9,
-        0x3C,
-        0x00,
-        0x00,
-        0x00, // mov ecx, 0x3C
-        // Write
-        0x44,
-        0x48,
-        0x8B,
-        0x05,
-        0xD8,
-        0xFE,
-        0xFF,
-        0xFF, // mov rax, qword ptr ds:[engine_fps]
-        0x89,
-        0x08, // mov dword ptr ds:[rax], ecx
-        0x44,
-        0x48,
-        0x8B,
-        0x05,
-        0xEE,
-        0xFE,
-        0xFF,
-        0xFF, // mov rax, qword ptr ds:[Ptr_Function_link]
-        0x48,
-        0x85,
-        0xC0, // test rax, rax
-        0x75,
-        0x01, // jnz callproc
-        0xC3, // ret
-        0x44,
-        0x48,
-        0x89,
-        0xE9, // mov rcx, rbp
-        0xFF,
-        0xE0, // jmp rax
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        // int3
-        0xCC,
-        'S',
-        'y',
-        'n',
-        'c',
-        ' ',
-        'f',
-        'a',
-        'i',
-        'l',
-        'e',
-        'd',
-        '!',
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        'E',
-        'r',
-        'r',
-        'o',
-        'r',
-        0x00,
-        0x00,
-        0x00,
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        // int3
-        0x44,
-        0x48,
-        0x81,
-        0xEC,
-        0x08,
-        0x08,
-        0x00,
-        0x00, // sub rsp, 0x808                 //code_start
-        0x8B,
-        0x0D,
-        0x32,
-        0xFE,
-        0xFF,
-        0xFF, // mov ecx,dword[unlocker_pid]
-        0x85,
-        0xC9, // test ecx, ecx
-        0x74,
-        0x06, // je ret
-        0x48,
-        0xE8,
-        0xA8,
-        0xFE,
-        0xFF,
-        0xFF, // call sync_start
-        0x44,
-        0x48,
-        0x81,
-        0xC4,
-        0x08,
-        0x08,
-        0x00,
-        0x00, // add rsp, 0x808
-        0xC3, // ret
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        // int3
-        0x48,
-        0x8B,
-        0x45,
-        0x00, // mov rax, qword [rbp]
-        0x48,
-        0x83,
-        0xF8,
-        0xF8, // cmp rax, -8
-        0x74,
-        0x18, // je load_ptr
-        // init ptr
-        0x48,
-        0x83,
-        0xEC,
-        0x38, // sub rsp, 0x38
-        0x44,
-        0xE8,
-        0x2C,
-        0x00,
-        0x00,
-        0x00, // call init_Ptr
-        0x48,
-        0x83,
-        0xC4,
-        0x38, // add rsp, 0x38
-        0x48,
-        0x89,
-        0x45,
-        0x08, // mov qword [rbp+0x08], rax
-        0x48,
-        0x6A,
-        0xF8, // push -8
-        0x8F,
-        0x45,
-        0x00, // pop [rbp]
-        // load_ptr
-        0x48,
-        0x8B,
-        0x45,
-        0x08, // mov rax, qword [rbp+0x08]
-        0x48,
-        0x85,
-        0xC0, // test rax, rax
-        0x75,
-        0x01, // jne write
-        0xC3,
-        // write
-        0x8B,
-        0x0D,
-        0x0A,
-        0xFE,
-        0xFF,
-        0xFF,
-        0x89,
-        0x08,
-        0xC3,
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        // int3
-        0x53, // push rbx                 init_Ptr
-        0x56, // push rsi
-        0x48,
-        0x83,
-        0xEC,
-        0x38, // sub rsp,0x38
-        0x44,
-        0x48,
-        0x8D,
-        0x1D,
-        0x42,
-        0x00,
-        0x00,
-        0x00, // lea rbx, qword [ModuleNAME]
-        0x2E,
-        0xBE,
-        0x64,
-        0x00,
-        0x00,
-        0x00, // mov esi, 0x64  (100ms)
-        // a
-        0x44,
-        0x48,
-        0x89,
-        0xD9, // mov rcx, rbx
-        0xFF,
-        0x15,
-        0x0A,
-        0xFE,
-        0xFF,
-        0xFF, // call [API_getmodA]
-        0x44,
-        0x48,
-        0x85,
-        0xC0, // test rax, rax
-        0x75,
-        0x0A, // jne continue
-        0x89,
-        0xF1, // mov ecx, esi
-        0xFF,
-        0x15,
-        0xF4,
-        0xFD,
-        0xFF,
-        0xFF, // call [API_Sleep]
-        0xEB,
-        0xE6, // jmp a
-        // continue
-        0x8B,
-        0x1D,
-        0xBC,
-        0xFD,
-        0xFF,
-        0xFF, // mov esi, dword[ptrRVA]
-        0x85,
-        0xDB, // test ebx, ebx
-        0x74,
-        0x06, // je return
-        0x48,
-        0x8D,
-        0x04,
-        0x18, // lea rax, [rax+rbx]
-        0xEB,
-        0x02, // jmp ret
-        0x31,
-        0xC0, // xor eax, eax
-        0x48,
-        0x83,
-        0xC4,
-        0x38, // add rsp,0x38
-        0x5E, // pop rsi
-        0x5B, // pop rbx
-        0xC3, // ret
-        // int3
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        'G',
-        'a',
-        'm',
-        'e',
-        'A',
-        's',
-        's',
-        'e',
-        'm',
-        'b',
-        'l',
-        'y',
-        '.',
-        'd',
-        'l',
-        'l',
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
-        0xCC,
+{
+    0x00, 0x00, 0x00, 0x00,                              //uint32_t unlocker_pid              _shellcode_[0]
+    0xC0, 0x35, 0xDE, 0x67,                              //uint32_t timestamp                 _shellcode_[4]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t unlocker_FpsValue_addr    _shellcode_[8]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t Ptr_il2cpp_fps            _shellcode_[0x10]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t Ptr_Engine_fps            _shellcode_[0x18]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t hksr_ui_ptr               _shellcode_[0x20]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t hksr_ui_type              _shellcode_[0x28]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t Ptr_Function_link         _shellcode_[0x30]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_MemProtect            _shellcode_[0x38]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_OpenProcess           _shellcode_[0x40]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_ReadProcessmem        _shellcode_[0x48]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_Sleep                 _shellcode_[0x50]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_NULL                  _shellcode_[0x58]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_MessageBoxA           _shellcode_[0x60]
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      //uint64_t API_CloseHandle           _shellcode_[0x68]
+    //int3
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+    //int3                                               
+    0x48, 0x83, 0xEC, 0x38,                              //sub rsp,0x38                       //sync_start
+    0x48, 0x8D, 0xAC, 0x24, 0x40, 0x00, 0x00, 0x00,      //lea rbp, [rsp+0x40]
+    0x41, 0x89, 0xC8,                                    //mov r8d, ecx
+    0x33, 0xD2,                                          //xor edx, edx
+    0xB9, 0xFF, 0xFF, 0x1F, 0x00,                        //mov ecx,1FFFFF
+    0xFF, 0x15, 0xA4, 0xFF, 0xFF, 0xFF,                  //call [API_OpenProcess]
+    0x85, 0xC0,                                          //test eax, eax
+    0x74, 0x68,                                          //jz return
+    0x2E, 0x41, 0x89, 0xC7,                              //mov r15d, eax
+    0x44, 0x48, 0x8B, 0x3D, 0x5C, 0xFF, 0xFF, 0xFF,      //mov rdi, qword[unlocker_FpsValue_addr]
+    0x4D, 0x31, 0xF6,                                    //xor r14, r14 
+    0xBB, 0xF4, 0x01, 0x00, 0x00,                        //mov ebx, 0x1F4        (500ms)
+    0x44, 0x48, 0x8D, 0x35, 0x04, 0x00, 0x00, 0x00,      //lea rsi, qword:[Read_tar_fps]
+    0x89, 0x5C, 0x24, 0x28,                              //mov dword:[RSP+0x28], ebx
+    //Read_tar_fps                                       
+    0x4C, 0x8D, 0x44, 0x24, 0x28,                        //lea r8, qword:[RSP+0x28]        
+    0x4C, 0x89, 0x74, 0x24, 0x20,                        //mov qword ptr ss:[rsp+20],r14
+    0x41, 0xB9, 0x04, 0x00, 0x00, 0x00,                  //mov r9d, 0x4  
+    0x48, 0x89, 0xFA,                                    //mov rdx, rdi  
+    0x44, 0x89, 0xF9,                                    //mov ecx, esi  
+    0xFF, 0x15, 0x6C, 0xFF, 0xFF, 0xFF,                  //call [API_ReadProcessmem]
+    0x85, 0xC0,                                          //test eax, eax     
+    0x75, 0x10,                                          //jnz continue   
+    //read fail                                          
+    0x48, 0x83, 0xC6, 0x30,                              //add r15, 0x30         //控制循环范围
+    0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00,                  //nop
+    0x48, 0xE8, 0x70, 0x00, 0x00, 0x00,                  //call Show Errormsg and CloseHandle 
+    //continue                                           
+    0x8B, 0x4C, 0x24, 0x28,                              //mov ecx, qword:[RSP+0x28]      
+    0x48, 0xE8, 0x16, 0x00, 0x00, 0x00,                  //call Sync_auto
+    0x89, 0xD9,                                          //mov ecx, ebx
+    0xFF, 0x15, 0x4E, 0xFF, 0xFF, 0xFF,                  //call [API_Sleep]
+    0xFF, 0xE6,                                          //jmp rsi
+    //int3                                               
+    0xCC, 0xCC, 0xCC, 0xCC,                              
+    //return                                             
+    0x48, 0x83, 0xC4, 0x38,                              //add rsp,0x38 
+    0xC3,                                                //ret  
+    //int3                                               
+    0xCC, 0xCC, 0xCC,                                    
+    //int3                                               
+    0x44, 0x48, 0x8B, 0x05, 0xF8, 0xFE, 0xFF, 0xFF,      //mov  rax, qword ptr ds:[il2cpp_fps]
+    0x48, 0x85, 0xC0,                                    //test rax, rax
+    0x74, 0x1B,                                          //jz Write
+    //read_game_set                                      
+    0x2E, 0x8B, 0x00,                                    //mov eax, qword ptr ss:[rax]
+    0x83, 0xF8, 0x1E,                                    //cmp eax, 0x1E 
+    0x74, 0x0D,                                          //je set 60
+    0x83, 0xF8, 0x2D,                                    //cmp eax, 0x2D
+    0x74, 0x0E,                                          //je Sync_unlocker
+    0x2E, 0xB9, 0xE8, 0x03, 0x00, 0x00,                  //mov ecx, 0x3E8                    
+    0xEB, 0x06,                                          //jmp Write
+    0x2E, 0xB9, 0x3C, 0x00, 0x00, 0x00,                  //mov ecx, 0x3C              
+    //Write                                              
+    0x44, 0x48, 0x8B, 0x05, 0xD8, 0xFE, 0xFF, 0xFF,      //mov rax, qword ptr ds:[engine_fps]
+    0x89, 0x08,                                          //mov dword ptr ds:[rax], ecx  
+    0x44, 0x48, 0x8B, 0x05, 0xE6, 0xFE, 0xFF, 0xFF,      //mov rax, qword ptr ds:[Ptr_Function_link]
+    0x48, 0x85, 0xC0,                                    //test rax, rax 
+    0x75, 0x01,                                          //jnz callproc
+    0xC3,                                                //ret
+    0x44, 0x48, 0x89, 0xE9,                              //mov rcx, rbp
+    0xFF, 0xE0,                                          //jmp rax
+    //int3                                               
+    0xCC, 0xCC,                                          
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,      
+    //int3                                               
+    0x48, 0x83, 0xEC, 0x28,                              //sub rsp, 0x28                        //Show Errormsg and closehandle
+    0x44, 0x44, 0x89, 0xF9,                              //mov ecx, r15d
+    0xFF, 0x15, 0xFA, 0xFE, 0xFF, 0xFF,                  //call [API_CloseHandle] 
+    0x31, 0xC9,                                          //xor ecx, ecx 
+    0x48, 0x8D, 0x15, 0x19, 0x00, 0x00, 0x00,            //lea rdx, qword:["Sync failed!"]
+    0x4C, 0x8D, 0x05, 0x22, 0x00, 0x00, 0x00,            //lea r8, qword:["Error"]
+    0x41, 0xB9, 0x10, 0x00, 0x00, 0x00,                  //mov r9d, 0x10 
+    0xFF, 0x15, 0xD6, 0xFE, 0xFF, 0xFF,                  //call [API_MessageBoxA] 
+    0x48, 0x83, 0xC4, 0x28,                              //add rsp, 0x28
+    0xC3,                                                //ret 
+    //int3                                               
+    0xCC,                                                
+    'S','y','n','c',' ','f','a','i','l','e','d','!', 
+    0x00, 0x00, 0x00, 0x00,
+    'E','r','r','o','r', 0x00, 0x00, 0x00,               
+    //int3                                               
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,      
+    //int3                                               
+    0x48, 0x8D, 0xA4, 0x24, 0xF8, 0xF7, 0xFF, 0xFF,      //sub rsp, 0x808                 //code_start
+    0x8B, 0x0D, 0x42, 0xFE, 0xFF, 0xFF,                  //mov ecx,dword[unlocker_pid]
+    0x85, 0xC9,                                          //test ecx, ecx
+    0x74, 0x06,                                          //je ret
+    0x48, 0xE8, 0xB8, 0xFE, 0xFF, 0xFF,                  //call sync_start
+    0x48, 0x8D, 0xA4, 0x24, 0x08, 0x08, 0x00, 0x00,      //add rsp, 0x808
+    0xC3,                                                //ret
+    //int3                                               
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,            
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,      
+    //int3                                               
+    0x4C, 0x48, 0x8B, 0x05, 0x38, 0xFE, 0xFF, 0xFF, 
+    0x8B, 0x0D, 0x3A, 0xFE, 0xFF, 0xFF, 
+    0x89, 0x08,
+    0xC3, 
+    //int3
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+    //int3
+    0x53,                                                 //push rbx                       //hooked_func VA + 0x200
+    0x55,                                                 //push rbp
+    0x56,                                                 //push rsi
+    0x57,                                                 //push rdi
+    0x48, 0x83, 0xEC, 0x68,                               //sub rsp, 0x48
+    0x44, 0x48, 0x8B, 0x35, 0xF0, 0x00, 0x00, 0x00,       //mov rsi, [plat_form_ptr]
+    0x40, 0x48, 0x8B, 0x1D, 0xF0, 0x00, 0x00, 0x00,       //mov rbx, [hook_func_ptr]
+    0x48, 0x8D, 0xAC, 0x24, 0x28, 0x00, 0x00, 0x00, 
+    0x48, 0x89, 0x4D, 0x08, 
+    0x48, 0x89, 0x55, 0x10,
+    0x4C, 0x89, 0x45, 0x18, 
+    0x4C, 0x89, 0x4D, 0x20, 
+    0x48, 0x89, 0xD9, 
+    0xE8, 0x68, 0x00, 0x00, 0x00,
+    0x48, 0x89, 0xF1, 
+    0xE8, 0x60, 0x00, 0x00, 0x00, 
+    0x48, 0x8B, 0x4D, 0x08, 
+    0x48, 0x8B, 0x55, 0x10,
+    0x4C, 0x8B, 0x45, 0x18, 
+    0x4C, 0x8B, 0x4D, 0x20, 
+    0xF3, 0x0F, 0x6F, 0x05, 0xB8, 0x00, 0x00, 0x00,
+    0xF3, 0x0F, 0x7F, 0x03, 
+    0x8B, 0x2E, 
+    0xC7, 0x06, 0x02, 0x00, 0x00, 0x00, 
+    0xFF, 0xD3, 
+    0x48, 0x97,
+    0xF3, 0x0F, 0x6F, 0x05, 0xB0, 0x00, 0x00, 0x00, 
+    0xF3, 0x0F, 0x7F, 0x03, 
+    0x89, 0x2E, 
+    0x48, 0x89, 0xD9, 
+    0xE8, 0x52, 0x00, 0x00, 0x00, 
+    0x48, 0x89, 0xF1, 
+    0xE8, 0x4A, 0x00, 0x00, 0x00, 
+    0x48, 0x97,
+    0x48, 0x83, 0xC4, 0x68, 
+    0x5F, 0x5E, 0x5D, 0x5B, 0xC3, 
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+    //int3
+    0x48, 0x83, 0xEC, 0x38, 
+    0x4C, 0x8D, 0x0C, 0x24, 
+    0x41, 0xB8, 0x40, 0x00, 0x00, 0x00, 
+    0xBA, 0x00, 0x10, 0x00, 0x00, 
+    0x48, 0x81, 0xE1, 0x00, 0xF0, 0xFF, 0xFF, 
+    0x49, 0x83, 0xC1, 0x28, 
+    0xFF, 0x15, 0x74, 0xFD, 0xFF, 0xFF, 
+    0x48, 0x83, 0xC4, 0x38, 
+    0xC3, 
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 
+    0x48, 0x83, 0xEC, 0x38, 
+    0x4C, 0x8D, 0x0C, 0x24, 
+    0x41, 0xB8, 0x20, 0x00, 0x00, 0x00, 
+    0xBA, 0x00, 0x10, 0x00, 0x00, 
+    0x48, 0x81, 0xE1, 0x00, 0xF0, 0xFF, 0xFF, 
+    0x49, 0x83, 0xC1, 0x28, 
+    0xFF, 0x15, 0x44, 0xFD, 0xFF, 0xFF, 
+    0x48, 0x83, 0xC4, 0x38, 
+    0xC3,
+    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC
 };
 
-static BYTE *init_shellcode()
-{
-    uintptr_t _shellcode_buffer = (uintptr_t)VirtualAlloc_Internal(0, 0x1000, PAGE_READWRITE);
-    if (_shellcode_buffer == 0)
-    {
-        return 0;
-    }
-    memcpy_mm((void *)_shellcode_buffer, &_shellcode_Const, sizeof(_shellcode_Const));
-
-    *(uint32_t *)_shellcode_buffer = GetCurrentProcessId(); // unlocker PID
-    {
-        char str_openproc[16] = {0};
-        *(DWORD64 *)(&str_openproc) = 0x9C908DAF919A8FB0;
-        *(DWORD64 *)(&str_openproc[8]) = 0x3FCA87DAFF8C8C9A;
-        decbyte(str_openproc, 2);
-        *(uint64_t *)(_shellcode_buffer + 0x40) = (uint64_t)GetProcAddress_Internal((HMODULE)~Kernel32_ADDR, str_openproc);
-    }
-    {
-        char str_readprocmem[24] = {0};
-        *(DWORD64 *)(&str_readprocmem) = 0x9C908DAF9B9E9AAD;
-        *(DWORD64 *)(&str_readprocmem[8]) = 0x8D90929AB28C8C9A;
-        decbyte(str_readprocmem, 2);
-        *(DWORD *)(&str_readprocmem[16]) = 0x79;
-        *(uint64_t *)(_shellcode_buffer + 0x48) = (uint64_t)GetProcAddress_Internal((HMODULE)~Kernel32_ADDR, str_readprocmem);
-    }
-    *(uint64_t *)(_shellcode_buffer + 0x50) = (uint64_t)(&Sleep);
-    *(uint64_t *)(_shellcode_buffer + 0x58) = (uint64_t)(&LoadLibraryA);
-    *(uint64_t *)(_shellcode_buffer + 0x60) = (uint64_t)(&MessageBoxA);
-    *(uint64_t *)(_shellcode_buffer + 0x68) = (uint64_t)(&CloseHandle);
-    return (BYTE *)_shellcode_buffer;
-}
-
-BOOL IsRunAsAdministrator()
-{
-    BOOL fIsRunAsAdmin = FALSE;
-    PSID pAdministratorsGroup = NULL;
-    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
-    if (!AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &pAdministratorsGroup))
-        return FALSE;
-
-    if (!CheckTokenMembership(NULL, pAdministratorsGroup, &fIsRunAsAdmin))
-    {
-        FreeSid(pAdministratorsGroup);
-        return FALSE;
-    }
-    FreeSid(pAdministratorsGroup);
-    return fIsRunAsAdmin;
-}
-
-BOOL ElevateNow()
-{
-    if (!IsRunAsAdministrator())
-    {
-        int argNum = 0;
-        LPWSTR *argvW = CommandLineToArgvW(GetCommandLineW(), &argNum);
-        std::wstring CommandLine{};
-        LPSHELLEXECUTEINFOW sei = (LPSHELLEXECUTEINFOW)malloc(sizeof(SHELLEXECUTEINFOW));
-        memset(sei, 0, sizeof(SHELLEXECUTEINFOW));
-        sei->cbSize = sizeof(SHELLEXECUTEINFOW);
-        sei->lpVerb = L"runas";
-        sei->lpFile = argvW[0];
-        sei->hwnd = NULL;
-        sei->nShow = SW_SHOWDEFAULT;
-        if (argNum >= 2)
-        {
-            for (int i = 1; i < argNum; i++)
-            {
-                CommandLine += argvW[i];
-                CommandLine += L" ";
-            }
-            sei->lpParameters = CommandLine.c_str();
-        }
-        if (!ShellExecuteExW(sei))
-        {
-            DWORD dwError = GetLastError();
-            if (dwError == ERROR_CANCELLED)
-            {
-                return ElevateNow();
-            }
-        }
-        return 1;
-    }
-    return 0;
-}
+#define sc_entryVA  (0x1B0)
+#define hooked_func_VA (0x200)
 
 // 特征搜索
-static uintptr_t PatternScan_Region(uintptr_t startAddress, size_t regionSize, const char *signature)
+static uintptr_t PatternScan_Region(uintptr_t startAddress, size_t regionSize, const char* signature)
 {
-    auto pattern_to_byte = [](const char *pattern)
-    {
-        std::vector<int> bytes;
-        const char *start = pattern;
-        const char *end = pattern + strlen(pattern);
-
-        for (const char *current = start; current < end; ++current)
+    auto pattern_to_byte = [](const char* pattern)
         {
-            if (*current == '?')
+            std::vector<int> bytes;
+            const char* start = pattern;
+            const char* end = pattern + strlen(pattern);
+
+            for (const char* current = start; current < end; ++current) 
             {
-                ++current;
-                if (*current == '?')
+                if (*current == '?') 
+                {
                     ++current;
-                bytes.push_back(-1);
+                    if (*current == '?')
+                        ++current;
+                    bytes.push_back(-1);
+                }
+                else 
+                {
+                    bytes.push_back(strtoul(current, const_cast<char**>(&current), 16));
+                }
             }
-            else
-            {
-                bytes.push_back(strtoul(current, const_cast<char **>(&current), 16));
-            }
-        }
-        return bytes;
-    };
+            return bytes;
+        };
 
     std::vector<int> patternBytes = pattern_to_byte(signature);
-    auto scanBytes = reinterpret_cast<std::uint8_t *>(startAddress);
+    auto scanBytes = reinterpret_cast<std::uint8_t*>(startAddress);
 
     for (size_t i = 0; i < regionSize - patternBytes.size(); i++)
     {
         bool found = true;
-        for (size_t j = 0; j < patternBytes.size(); ++j)
+        for (size_t j = 0; j < patternBytes.size(); ++j) 
         {
-            if (scanBytes[i + j] != patternBytes[j] && patternBytes[j] != -1)
+            if (scanBytes[i + j] != patternBytes[j] && patternBytes[j] != -1) 
             {
                 found = false;
                 break;
             }
         }
-        if (found)
-        {
+        if (found) 
             return (uintptr_t)&scanBytes[i];
-        }
     }
     return 0;
 }
+
 
 static std::wstring GetLastErrorAsString(DWORD code)
 {
@@ -945,7 +293,7 @@ static std::wstring GetLastErrorAsString(DWORD code)
     return ret;
 }
 
-// Throw error msgbox
+//Throw error msgbox
 static void Show_Error_Msg(LPCWSTR Prompt_str)
 {
     if (ErrorMsg_EN == 0)
@@ -954,19 +302,33 @@ static void Show_Error_Msg(LPCWSTR Prompt_str)
     if (Error_code == ERROR_SUCCESS)
         Error_code = ERROR_INVALID_DATA;
     wstring message{};
+    wstring title{};
     if (Prompt_str)
         message = Prompt_str;
     else
         message = L"Default Error Message";
     message += L"\n" + GetLastErrorAsString(Error_code);
-    MessageBoxW(_console_HWND, message.c_str(), L"An Error has occurred!", 0x10);
-    return;
+    UNICODE_STRING message_str;
+    UNICODE_STRING title_str;
+    {
+        wchar_t cwstr[0x1000];
+        PEB64* peb = (PEB64*)__readgsqword(0x60);
+        HMODULE self = (HMODULE)peb->ImageBaseAddress;
+        GetModuleFileNameW(self, cwstr, 0x800);
+        title = cwstr;
+        title = title.substr(title.find_last_of(L"\\") + 1);
+    }
+    InitUnicodeString(&message_str, (PCWSTR)message.c_str());
+    InitUnicodeString(&title_str, (PCWSTR)title.c_str());
+    ULONG_PTR params[4] = { (ULONG_PTR)&message_str, (ULONG_PTR)&title_str, ((ULONG)ResponseButtonOK | IconError), INFINITE };
+    DWORD response;
+    NtRaiseHardError(STATUS_SERVICE_NOTIFICATION | HARDERROR_OVERRIDE_ERRORMODE, 4, 3, params, 0, &response);
 }
 
-// create pwstr 1 len = 2 byte
-static wstring *NewWstring(size_t strlen)
+//create pwstr 1 len = 2 byte
+static wstring* NewWstring(size_t strlen)
 {
-    uintptr_t *wcsptr = (uintptr_t *)malloc(sizeof(wstring));
+    uintptr_t* wcsptr = (uintptr_t*)malloc(sizeof(wstring));
     if (!wcsptr)
     {
         goto __malloc_fail;
@@ -974,20 +336,20 @@ static wstring *NewWstring(size_t strlen)
     memset(wcsptr, 0, sizeof(wstring));
     if (strlen <= 7)
     {
-        *(size_t *)((uintptr_t)wcsptr + 0x10 + sizeof(uintptr_t)) = strlen;
-        return (wstring *)wcsptr;
+        *(size_t*)((uintptr_t)wcsptr + 0x10 + sizeof(uintptr_t)) = strlen;
+        return (wstring*)wcsptr;
     }
     else
     {
-        wchar_t *wcstr = (wchar_t *)malloc(strlen * 2);
+        wchar_t* wcstr = (wchar_t*)malloc(strlen * 2);
         if (!wcstr)
         {
             goto __malloc_fail;
         }
-        *(uint64_t *)wcstr = 0;
-        *(uintptr_t *)wcsptr = (uintptr_t)wcstr;
-        *(size_t *)((uintptr_t)wcsptr + 0x10 + sizeof(uintptr_t)) = strlen;
-        return (wstring *)wcsptr;
+        *(uint64_t*)wcstr = 0;
+        *(uintptr_t*)wcsptr = (uintptr_t)wcstr;
+        *(size_t*)((uintptr_t)wcsptr + 0x10 + sizeof(uintptr_t)) = strlen;
+        return (wstring*)wcsptr;
     }
 
 __malloc_fail:
@@ -996,40 +358,86 @@ __malloc_fail:
     return 0;
 }
 
-// destroy
-static INLINE void DelWstring(wstring **pwstr)
+//destroy
+static INLINE void DelWstring(wstring** pwstr)
 {
-    if (*(uintptr_t *)((uintptr_t)*(uintptr_t *)pwstr + 0x10 + sizeof(uintptr_t)) > 7)
-        free(**(wchar_t ***)pwstr);
+    if(*(uintptr_t*)((uintptr_t)*(uintptr_t*)pwstr + 0x10 + sizeof(uintptr_t)) > 7)
+        free(**(wchar_t***)pwstr);  
     free(*pwstr);
     *pwstr = 0;
     return;
 }
 
+
+static BYTE* init_shellcode()
+{
+    uintptr_t _shellcode_buffer = (uintptr_t)VirtualAlloc_Internal(0, 0x1000, PAGE_READWRITE);
+    if (_shellcode_buffer == 0)
+    {
+        return 0;
+    }
+    memmove((void*)_shellcode_buffer, &_shellcode_Const, sizeof(_shellcode_Const));
+
+    *(uint32_t*)_shellcode_buffer = GetCurrentProcessId();       //unlocker PID
+    {
+        char str_openproc[16] = { 0 };
+        *(DWORD64*)(&str_openproc) = 0x9C908DAF919A8FB0;
+        *(DWORD64*)(&str_openproc[8]) = 0x3FCA87DAFF8C8C9A;
+        decbyte(str_openproc, 2);
+        uint64_t p_openproc = (uint64_t)GetProcAddress_Internal((HMODULE)~Kernel32_ADDR, str_openproc);
+        if (!p_openproc)
+        {
+            Show_Error_Msg(L"Bad Function (Openprocess)");
+            VirtualFree_Internal((void*)_shellcode_buffer, 0, MEM_RELEASE);
+            return 0;
+        }
+        *(uint64_t*)(_shellcode_buffer + 0x40) = p_openproc;
+    }
+    {
+        char str_readprocmem[24] = { 0 };
+        *(DWORD64*)(&str_readprocmem) = 0x9C908DAF9B9E9AAD;
+        *(DWORD64*)(&str_readprocmem[8]) = 0x8D90929AB28C8C9A;
+        decbyte(str_readprocmem, 2);
+        *(DWORD*)(&str_readprocmem[16]) = 0x79;
+        uint64_t p_readmem = (uint64_t)GetProcAddress_Internal((HMODULE)~Kernel32_ADDR, str_readprocmem);
+        if (!p_readmem)
+        {
+            Show_Error_Msg(L"Bad Function (ReadProcMem)");
+            VirtualFree_Internal((void*)_shellcode_buffer, 0, MEM_RELEASE);
+            return 0;
+        }
+        *(uint64_t*)(_shellcode_buffer + 0x48) = p_readmem;
+    }
+    *(uint64_t*)(_shellcode_buffer + 0x50) = (uint64_t)(&Sleep);
+    //*(uint64_t*)(_shellcode_buffer + 0x58) = (uint64_t)(&LoadLibraryA);
+    *(uint64_t*)(_shellcode_buffer + 0x60) = (uint64_t)(&MessageBoxA);
+    *(uint64_t*)(_shellcode_buffer + 0x68) = (uint64_t)(&CloseHandle);
+    return (BYTE*)_shellcode_buffer;
+}
+
 //[in],[in],[out],[out],[in]
-static bool Get_Section_info(uintptr_t PE_buffer, LPCSTR Name_sec, uint32_t *Sec_Vsize, uintptr_t *Sec_Remote_RVA, uintptr_t Remote_BaseAddr)
+static bool Get_Section_info(uintptr_t PE_buffer, LPCSTR Name_sec, uint32_t* Sec_Vsize, uintptr_t* Sec_Remote_RVA, uintptr_t Remote_BaseAddr)
 {
     if ((!PE_buffer) || (!Name_sec) || (!Sec_Vsize) || (!Sec_Remote_RVA))
         return 0;
-    uint64_t tar_sec = *(uint64_t *)Name_sec;                                 // max 8 byte
-    uintptr_t WinPEfileVA = *(uintptr_t *)(&PE_buffer) + 0x3c;                // dos_header
-    uintptr_t PEfptr = *(uintptr_t *)(&PE_buffer) + *(uint32_t *)WinPEfileVA; // get_winPE_VA
-    _IMAGE_NT_HEADERS64 *_FilePE_Nt_header = (_IMAGE_NT_HEADERS64 *)PEfptr;
-    _IMAGE_SECTION_HEADER _sec_temp{};
+    uint64_t tar_sec = *(uint64_t*)Name_sec;//max 8 byte
+    int32_t* WinPEfileVA = (int32_t*)((uint64_t)PE_buffer + 0x3C); //dos_header
+    uintptr_t PEfptr = (uintptr_t)((uint64_t)PE_buffer + *WinPEfileVA); //get_winPE_VA
+    _IMAGE_NT_HEADERS64* _FilePE_Nt_header = (_IMAGE_NT_HEADERS64*)PEfptr;
     if (_FilePE_Nt_header->Signature == 0x00004550)
     {
-        DWORD sec_num = _FilePE_Nt_header->FileHeader.NumberOfSections; // 获得指定节段参数
+        DWORD sec_num = _FilePE_Nt_header->FileHeader.NumberOfSections;//获得指定节段参数
         sec_num++;
         DWORD num = sec_num;
         DWORD target_sec_VA_start = 0;
         do
         {
-            _sec_temp = *(_IMAGE_SECTION_HEADER *)(PEfptr + 264 + (40 * (static_cast<unsigned long long>(sec_num) - num)));
+            PIMAGE_SECTION_HEADER _sec_temp = (PIMAGE_SECTION_HEADER)(PEfptr + 264 + (40 * (static_cast<unsigned long long>(sec_num) - num)));
 
-            if (*(uint64_t *)(_sec_temp.Name) == tar_sec)
+            if (*(uint64_t*)(_sec_temp->Name) == tar_sec)
             {
-                target_sec_VA_start = _sec_temp.VirtualAddress;
-                *Sec_Vsize = _sec_temp.Misc.VirtualSize;
+                target_sec_VA_start = _sec_temp->VirtualAddress;
+                *Sec_Vsize = _sec_temp->Misc.VirtualSize;
                 *Sec_Remote_RVA = Remote_BaseAddr + target_sec_VA_start;
                 return 1;
             }
@@ -1042,31 +450,33 @@ static bool Get_Section_info(uintptr_t PE_buffer, LPCSTR Name_sec, uint32_t *Sec
     return 0;
 }
 
-// 通过进程名搜索进程ID
-static DWORD GetPID(const wchar_t *ProcessName)
+//通过进程名搜索进程ID
+static DWORD GetPID(const wchar_t* ProcessName)
 {
     return GetProcPID(ProcessName);
 
-    // DWORD pid = 0;
-    // PROCESSENTRY32W* pe32 = (PROCESSENTRY32W*)malloc(sizeof(PROCESSENTRY32W));
-    // if (!pe32)
-    //     return 0;
-    // wstring name = ProcessName;
-    // towlower0((wchar_t*)name.c_str());
-    // pe32->dwSize = sizeof(PROCESSENTRY32W);
-    // HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    // for (Process32FirstW(snap, pe32); Process32NextW(snap, pe32);)
+    //DWORD pid = 0;
+    //PROCESSENTRY32W* pe32 = (PROCESSENTRY32W*)malloc(sizeof(PROCESSENTRY32W));
+    //if (!pe32)
+    //    return 0;
+    //wstring name = ProcessName;
+    //towlower0((wchar_t*)name.c_str());
+    //pe32->dwSize = sizeof(PROCESSENTRY32W);
+    //HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    //for (Process32FirstW(snap, pe32); Process32NextW(snap, pe32);)
     //{
-    //     towlower0(pe32->szExeFile);
-    //     if (wcstrcmp0(pe32->szExeFile, name.c_str()))
-    //     {
-    //         pid = pe32->th32ProcessID;
-    //         break;
-    //     }
-    // }
-    // CloseHandle(snap);
-    // return pid;
+    //    towlower0(pe32->szExeFile);
+    //    if (wcstrcmp0(pe32->szExeFile, name.c_str()))
+    //    {
+    //        pid = pe32->th32ProcessID;
+    //        break;
+    //    }
+    //}
+    //CloseHandle(snap);
+    //return pid;
+
 }
+
 
 static bool WriteConfig(int fps)
 {
@@ -1080,9 +490,9 @@ static bool WriteConfig(int fps)
     LPVOID buffer = VirtualAlloc_Internal(0, 0x4000, PAGE_READWRITE);
     if (!buffer)
         return false;
-    *(DWORD64 *)&content = ((DWORD64)buffer);
-    *(DWORD64 *)((DWORD64)&content + 0x18) = 0x2000;
-    *(DWORD *)buffer = 0xFEFF;
+    *(DWORD64*)&content = ((DWORD64)buffer);
+    *(DWORD64*)((DWORD64)&content + 0x18) = 0x2000;
+    *(DWORD*)buffer = 0xFEFF;
     content += L"[Setting]\nGenshinPath=" + GenGamePath + L"\n";
     content += L"HKSRPath=" + HKSRGamePath + L"\n";
     {
@@ -1118,6 +528,7 @@ static bool WriteConfig(int fps)
     return re;
 }
 
+
 static bool LoadConfig()
 {
     INIReader reader(CONFIG_FILENAME);
@@ -1125,7 +536,7 @@ static bool LoadConfig()
     {
         wprintf_s(L"\n Config Not Found !\n 配置文件未发现\n Don't close unlocker and open the game \n 不要关闭解锁器,并打开游戏\n Wait for game start ......\n 等待游戏启动.....\n");
 
-    _no_config:
+_no_config:
         DWORD pid = 0;
         while (1)
         {
@@ -1134,12 +545,12 @@ static bool LoadConfig()
                 if ((pid = GetPID(L"YuanShen.exe")) || (pid = GetPID(L"GenshinImpact.exe")))
                     break;
             }
-            else
+            else 
             {
                 if (pid = GetPID(L"StarRail.exe"))
                     break;
             }
-            Sleep(200);
+            NtSleep(200);
         }
         HANDLE hProcess = OpenProcess_Internal(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE | PROCESS_TERMINATE, pid);
         if (!hProcess)
@@ -1153,8 +564,8 @@ static bool LoadConfig()
         // SYNCHRONIZE - 用于等待进程结束 (WaitForSingleObject)
 
         DWORD length = 0x4000;
-        wchar_t *szPath = (wchar_t *)VirtualAlloc_Internal(0, length, PAGE_READWRITE);
-        if (!szPath)
+        wchar_t* szPath = (wchar_t*)VirtualAlloc_Internal(0, length, PAGE_READWRITE);
+        if(!szPath)
         {
             Show_Error_Msg(L"Alloc Memory failed! (Get game path)");
             return 0;
@@ -1166,11 +577,11 @@ static bool LoadConfig()
             return 0;
         }
 
-        if (isGenshin)
+        if (isGenshin) 
         {
             GenGamePath = szPath;
         }
-        else
+        else 
         {
             HKSRGamePath = szPath;
         }
@@ -1182,15 +593,15 @@ static bool LoadConfig()
         while (ExitCode == STILL_ACTIVE)
         {
             // wait for the game to close then continue
-            TerminateProcess(hProcess, 0);
+            TerminateProcess_Internal(hProcess, 0);
             WaitForSingleObject(hProcess, 2000);
             GetExitCodeProcess(hProcess, &ExitCode);
         }
         CloseHandle(hProcess);
 
-        // clean screen
+        //clean screen
         {
-            COORD pos = {0, 8};
+            COORD pos = { 0, 8 };
             HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
             SetConsoleCursorPosition(hOut, pos);
         }
@@ -1203,7 +614,7 @@ static bool LoadConfig()
             printf_s("\n");
         }
         {
-            COORD pos = {0, 8};
+            COORD pos = { 0, 8 };
             HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
             SetConsoleCursorPosition(hOut, pos);
         }
@@ -1228,7 +639,7 @@ static bool LoadConfig()
         {
             wprintf_s(L"\n HKSR Path Error!\n Plase open StarRail to set game path.\n 路径错误，请手动打开崩铁来设置游戏路径 \n");
             goto _no_config;
-        }
+        }   
     }
 
 __path_ok:
@@ -1246,22 +657,20 @@ __path_ok:
     ErrorMsg_EN = reader.GetBoolean(L"Setting", L"EnableErrorMsg", 1);
     isHook = reader.GetBoolean(L"Setting", L"IsHookGameSet", 0);
     Tar_Device = reader.GetInteger(L"Setting", L"TargetDevice", 2);
-    if (Tar_Device > 0x20)
-        Tar_Device = 2;
     ConfigPriorityClass = reader.GetInteger(L"Setting", L"GameProcessPriority", 3);
     switch (ConfigPriorityClass)
     {
-    case 0:
+    case 0 :
         GamePriorityClass = REALTIME_PRIORITY_CLASS;
         break;
-    case 1:
+    case 1 :
         GamePriorityClass = HIGH_PRIORITY_CLASS;
         break;
     case 2:
         GamePriorityClass = ABOVE_NORMAL_PRIORITY_CLASS;
         break;
     case 3:
-        GamePriorityClass = NORMAL_PRIORITY_CLASS;
+        GamePriorityClass = NORMAL_PRIORITY_CLASS; 
         break;
     case 4:
         GamePriorityClass = BELOW_NORMAL_PRIORITY_CLASS;
@@ -1273,9 +682,10 @@ __path_ok:
     }
     FpsValue = reader.GetInteger(L"Setting", L"FPS", FPS_TARGET);
     WriteConfig(FpsValue);
-
+    
     return 1;
 }
+
 
 struct Boot_arg
 {
@@ -1283,26 +693,26 @@ struct Boot_arg
     LPWSTR Path_Lib;
 };
 //[out] CommandLinew
-// The first 16 bytes are used by other arg
-static bool Init_Game_boot_arg(Boot_arg *arg)
+//The first 16 bytes are used by other arg
+static bool Init_Game_boot_arg(Boot_arg* arg)
 {
     if (!arg)
     {
         return 0;
     }
     int argNum = 0;
-    LPWSTR *argvW = CommandLineToArgvW(GetCommandLineW(), &argNum);
+    LPWSTR* argvW = CommandLineToArgvW(GetCommandLineW(), &argNum);
     std::wstring CommandLine{};
     if (argNum >= 2)
     {
-        int _game_argc_start = 0;
+        int _game_argc_start = 2;
         wchar_t boot_genshin[] = L"-genshin";
         wchar_t boot_starrail[] = L"-hksr";
         wchar_t loadLib[] = L"-loadlib";
         wchar_t Use_Mobile_UI[] = L"-enablemobileui";
-        wstring *temparg = NewWstring(0x400);
+        wstring* temparg = NewWstring(0x400);
         *temparg = argvW[1];
-        towlower0((wchar_t *)temparg->c_str());
+        towlower0((wchar_t*)temparg->c_str());
         if (*temparg == boot_genshin)
         {
             SetConsoleTitleA("This console control GenshinFPS");
@@ -1310,16 +720,12 @@ static bool Init_Game_boot_arg(Boot_arg *arg)
             if (argNum > 2)
             {
                 *temparg = argvW[2];
-                towlower0((wchar_t *)temparg->c_str());
+                towlower0((wchar_t*)temparg->c_str());
                 if (*temparg == Use_Mobile_UI)
                 {
                     Use_mobile_UI = 1;
-                    CommandLine += L"use_mobile_platform -is_cloud 1 -platform_type CLOUD_THIRD_PARTY_MOBILE ";
+                    //CommandLine += L"use_mobile_platform -is_cloud 1 -platform_type CLOUD_THIRD_PARTY_MOBILE ";
                     _game_argc_start = 3;
-                }
-                else
-                {
-                    _game_argc_start = 2;
                 }
             }
         }
@@ -1330,27 +736,23 @@ static bool Init_Game_boot_arg(Boot_arg *arg)
             if (argNum > 2)
             {
                 *temparg = argvW[2];
-                towlower0((wchar_t *)temparg->c_str());
+                towlower0((wchar_t*)temparg->c_str());
                 if (*temparg == Use_Mobile_UI)
                 {
                     Use_mobile_UI = 1;
                     _game_argc_start = 3;
                 }
-                else
-                {
-                    _game_argc_start = 2;
-                }
             }
         }
         else
         {
-            MessageBoxW(_console_HWND, L"参数错误 \nArguments error ( unlocker.exe -[game] -[game argv] ..... ) \n", L"Tip", 0x10);
+            Show_Error_Msg(L"参数错误 \nArguments error ( unlocker.exe -[game] -[game argv] ..... ) \n");
             return 0;
         }
         if (argNum > _game_argc_start)
         {
             *temparg = argvW[_game_argc_start];
-            towlower0((wchar_t *)temparg->c_str());
+            towlower0((wchar_t*)temparg->c_str());
             if (*temparg == loadLib)
             {
                 _game_argc_start++;
@@ -1358,7 +760,7 @@ static bool Init_Game_boot_arg(Boot_arg *arg)
                 {
                     *temparg = argvW[_game_argc_start];
                     LPVOID LibPath = malloc(temparg->size() * 2);
-                    strncpy0((wchar_t *)LibPath, temparg->c_str(), temparg->size() * 2);
+                    strncpy0((wchar_t*)LibPath, temparg->c_str(), temparg->size() * 2);
                     arg->Path_Lib = (LPWSTR)LibPath;
                     _game_argc_start++;
                 }
@@ -1391,125 +793,122 @@ static bool Init_Game_boot_arg(Boot_arg *arg)
     arg->Game_Arg = (LPWSTR)malloc(0x2000);
     if (!arg->Game_Arg)
         return 0;
-    strncpy0((wchar_t *)((BYTE *)arg->Game_Arg), CommandLine.c_str(), CommandLine.size() * 2);
+    *(uint64_t*)arg->Game_Arg = 0;
+    strncpy0((wchar_t*)((BYTE*)arg->Game_Arg), CommandLine.c_str(), CommandLine.size() * 2);
     return 1;
 }
 
+
+struct inject_arg
+{
+    uint64_t arg1;//GI fpsptr
+    uint64_t arg2;//HKSR uiptr /GIui type
+    uint64_t arg3;//GI platform_sign
+    uint64_t arg4;//GI hook_func
+};
 // Hotpatch
-static uint64_t inject_patch(HANDLE Tar_handle, uintptr_t para, uintptr_t _ptr_fps, DWORD Ptr_Rva)
+static uint64_t inject_patch(HANDLE Tar_handle, uintptr_t _ptr_fps, inject_arg* arg)
 {
     if (!_ptr_fps)
         return 0;
 
-    BYTE *_sc_buffer = _G_shellcode_buffer;
-
-    // genshin_get_gameset
-    if (isGenshin && isHook)
+    BYTE* _sc_buffer = init_shellcode();
+    if (!_sc_buffer)
     {
-        *(uint64_t *)(_sc_buffer + 0x10) = para;
-    }
-
-    // shellcode patch
-    *(uint64_t *)(_sc_buffer + 0x8) = (uint64_t)(&FpsValue); // source ptr
-    *(uint64_t *)(_sc_buffer + 0x18) = _ptr_fps;
-
-    LPVOID __Tar_proc_buffer = VirtualAllocEx_Internal(Tar_handle, NULL, 0x1000, PAGE_READWRITE);
-    if (__Tar_proc_buffer)
-    {
-        if (Ptr_Rva)
-        {
-            *(uint32_t *)(_sc_buffer + 0x20) = Ptr_Rva;
-            *(uint32_t *)(_sc_buffer + 0x24) = Tar_Device;
-            *(uint64_t *)(_sc_buffer + 0x38) = (uint64_t)__Tar_proc_buffer + 0x1F0;
-        }
-        if (WriteProcessMemoryInternal(Tar_handle, __Tar_proc_buffer, (void *)_sc_buffer, sizeof(_shellcode_Const), 0))
-        {
-            if (VirtualProtect_Internal(Tar_handle, __Tar_proc_buffer, 0x1000, PAGE_EXECUTE_READ, 0))
-            {
-                HANDLE temp = CreateThread_Internal(Tar_handle, 0, (LPTHREAD_START_ROUTINE)((uint64_t)__Tar_proc_buffer + sc_entryVA), NULL);
-                if (!temp)
-                {
-                    goto __proc_failed;
-                }
-                /*else
-                {
-                    temp = CreateRemoteThread(Tar_handle, 0, 0, (LPTHREAD_START_ROUTINE)((uint64_t)__Tar_proc_buffer + sc_entryVA), 0, 0, 0);
-                    if (!temp)
-                        goto __proc_failed;
-                }*/
-                CloseHandle(temp);
-                return ((uint64_t)__Tar_proc_buffer);
-            }
-
-        __proc_failed:
-            Show_Error_Msg(L"Create SyncThread Fail! ");
-            return 0;
-        }
-        Show_Error_Msg(L"Write Scode Fail! ");
+        Show_Error_Msg(L"initcode failed!");
         return 0;
     }
-    else
+
+    //genshin_get_gameset
+    if (isGenshin && isHook)
+    {
+        *(uint64_t*)(_sc_buffer + 0x10) = arg->arg1;
+    }
+
+    //shellcode patch
+    *(uint64_t*)(_sc_buffer + 0x8) = (uint64_t)(&FpsValue); //source ptr
+    *(uint64_t*)(_sc_buffer + 0x18) = _ptr_fps;
+
+    LPVOID __Tar_proc_buffer = VirtualAllocEx_Internal(Tar_handle, NULL, 0x1000, PAGE_READWRITE);
+    if (!__Tar_proc_buffer)
     {
         Show_Error_Msg(L"AllocEx Fail! ");
         return 0;
     }
-}
-
-static DWORD Hksr_ENmobile_get_Rva(LPCWSTR GPath)
-{
-    HMODULE il2cpp_base = 0;
+    if (arg->arg2 && (!isGenshin))
     {
-        wstring path = GPath;
-        path += L"\\GameAssembly.dll";
-        il2cpp_base = LoadLibraryW(path.c_str());
-        if (!il2cpp_base)
+        *(uint64_t*)(_sc_buffer + 0x20) = arg->arg2;
+        *(uint32_t*)(_sc_buffer + 0x28) = 2;
+        *(uint64_t*)(_sc_buffer + 0x30) = (uint64_t)__Tar_proc_buffer + 0x1E0;
+    }
+    if (isGenshin && Use_mobile_UI)
+    {
+        if (1)
         {
-            Show_Error_Msg(L"load GameAssembly.dll Failed !\n");
+            {
+                char str_memprotect[16] = { 0 };
+                *(DWORD64*)(&str_memprotect) = 0xAF939E8A8B8D96A9;
+                *(DWORD64*)(&str_memprotect[8]) = 0x8EFF8B9C9A8B908D;
+                decbyte(str_memprotect, 2);
+                uint64_t API_memprotect = (uint64_t)GetProcAddress_Internal((HMODULE)~Kernel32_ADDR, str_memprotect);
+                if (!API_memprotect)
+                {
+                    Show_Error_Msg(L"Fail getFunction (memprotect)");
+                    goto __exit_block;
+                }
+                *(uint64_t*)(_sc_buffer + 0x38) = API_memprotect;
+            }
+            {
+                *(uint64_t*)(_sc_buffer + sizeof(_shellcode_Const)) = arg->arg3;//p_platform_
+                *(uint64_t*)(_sc_buffer + sizeof(_shellcode_Const) + 8) = arg->arg4;//func
+                if (!ReadProcessMemoryInternal(Tar_handle, (void*)arg->arg4, (_sc_buffer + sizeof(_shellcode_Const) + 0x10), 0x10, 0))
+                {
+                    Show_Error_Msg(L"Failed hook (GIui)");
+                    goto __exit_block;
+                }
+                uint64_t* hook_pa = (uint64_t*)(_sc_buffer + sizeof(_shellcode_Const) + 0x20);
+                *hook_pa = 0x225FF;
+                *(hook_pa + 1) = ((uint64_t)__Tar_proc_buffer + hooked_func_VA);
+                if (!WriteProcessMemoryInternal(Tar_handle, (void*)arg->arg4, hook_pa, 0x10, 0))
+                {
+                    Show_Error_Msg(L"Failed hook (GIui)");
+                    goto __exit_block;
+                }
+            }
+            uint32_t platform_var = arg->arg2;
+            if (!WriteProcessMemoryInternal(Tar_handle, (void*)arg->arg3, &platform_var, 4, 0))
+            {
+                Show_Error_Msg(L"Failed hook (GIui)");
+                goto __exit_block;
+            }
+        }
+        else
+        {
+            Show_Error_Msg(L"Failed protect (GIui)");
+        }
+    }
+__exit_block:
+
+    if (!WriteProcessMemoryInternal(Tar_handle, __Tar_proc_buffer, (void*)_sc_buffer, 0x1000, 0))
+    {
+        Show_Error_Msg(L"Write Scode Fail! ");
+        return 0;
+    }
+    VirtualFree_Internal(_sc_buffer, 0, MEM_RELEASE);
+    if (VirtualProtect_Internal(Tar_handle, __Tar_proc_buffer, 0x1000, PAGE_EXECUTE_READ, 0))
+    {
+        HANDLE temp = CreateRemoteThreadEx_Internal(Tar_handle, 0, (LPTHREAD_START_ROUTINE)((uint64_t)__Tar_proc_buffer + sc_entryVA), NULL);
+        if (!temp)
+        {
+            Show_Error_Msg(L"Create SyncThread Fail! ");
             return 0;
         }
+        CloseHandle(temp);
+        return ((uint64_t)__Tar_proc_buffer);
     }
-    uintptr_t GameAssembly_PEbuffer = (uintptr_t)il2cpp_base;
-
-    uintptr_t Ua_il2cpp_RVA = 0;
-    DWORD32 Ua_il2cpp_Vsize = 0;
-    if (Get_Section_info(GameAssembly_PEbuffer, "il2cpp", &Ua_il2cpp_Vsize, &Ua_il2cpp_RVA, GameAssembly_PEbuffer))
-    {
-        if (Ua_il2cpp_RVA && Ua_il2cpp_Vsize)
-        {
-            // 80 B9 ?? ?? ?? ?? 00 74 46 C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3       //HKSR_2.4.0 - 2.5.0
-            //       75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3          //old-x-x-x--2.6.0
-            DWORD Device_type = Tar_Device;
-            DWORD64 tar_addr;
-            bool is_new_ver = 1;
-            DWORD64 address = 0;
-            if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3"))
-            {
-                tar_addr = address + 9;
-                is_new_ver = 0;
-            }
-            else if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "80 B9 ?? ?? ?? ?? 00 74 46 C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3"))
-            {
-                tar_addr = address + 11;
-            }
-            else
-            {
-                Show_Error_Msg(L"UI pattern outdate!");
-                FreeLibrary((HMODULE)il2cpp_base);
-                return 0;
-            }
-            int64_t rip = tar_addr;
-            rip += *(int32_t *)rip;
-            rip += 8;
-            FreeLibrary((HMODULE)il2cpp_base);
-            return (uint32_t)(rip - (uint64_t)il2cpp_base);
-        }
-    }
-    Show_Error_Msg(L"get Section info Error !\n");
-    FreeLibrary((HMODULE)il2cpp_base);
-    return 0;
 }
 
-// when DllPath is null return base img addr
+//when DllPath is null return base img addr
 static HMODULE RemoteDll_Inject(HANDLE Tar_handle, LPCWSTR DllPath)
 {
     size_t Pathsize = 0x2000;
@@ -1518,7 +917,7 @@ static HMODULE RemoteDll_Inject(HANDLE Tar_handle, LPCWSTR DllPath)
     {
         while (1)
         {
-            if (*(WORD *)(DllPath + strlen))
+            if (*(WORD*)(DllPath + strlen))
             {
                 strlen++;
             }
@@ -1529,7 +928,7 @@ static HMODULE RemoteDll_Inject(HANDLE Tar_handle, LPCWSTR DllPath)
                 break;
             }
         }
-        HANDLE file_Handle = CreateFileW(DllPath, GENERIC_ALL, NULL, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE file_Handle = CreateFileW(DllPath, GENERIC_READ, NULL, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (file_Handle != INVALID_HANDLE_VALUE)
         {
             CloseHandle(file_Handle);
@@ -1543,7 +942,7 @@ __inject_proc:
     if (buffer)
     {
         HMODULE result = 0;
-        DWORD64 payload[4] = {0};
+        DWORD64 payload[4] = { 0 };
         if (!DllPath)
         {
             payload[0] = 0x5848606A38EC8348;
@@ -1565,23 +964,23 @@ __inject_proc:
                 LPVOID RCX = 0;
                 if (DllPath)
                 {
-                    if (!WriteProcessMemoryInternal(Tar_handle, ((BYTE *)buffer) + 0x1000, (void *)DllPath, strlen, 0))
+                    if (!WriteProcessMemoryInternal(Tar_handle, ((BYTE*)buffer) + 0x1000, (void*)DllPath, strlen, 0))
                     {
                         VirtualFreeEx_Internal(Tar_handle, buffer, 0, MEM_RELEASE);
                         return 0;
                     }
-                    RCX = ((BYTE *)buffer) + 0x1000;
+                    RCX = ((BYTE*)buffer) + 0x1000;
                 }
-                HANDLE hThread = CreateThread_Internal(Tar_handle, 0, (LPTHREAD_START_ROUTINE)buffer, RCX);
+                HANDLE hThread = CreateRemoteThreadEx_Internal(Tar_handle, 0, (LPTHREAD_START_ROUTINE)buffer, RCX);
                 if (hThread)
                 {
-                    if (DWORD dwre = WaitForSingleObject(hThread, 60000))
+                    if (WaitForSingleObject(hThread, 60000))
                     {
                         Show_Error_Msg(L"Dll load Wait Time out!");
                         CloseHandle(hThread);
                         return 0;
                     }
-                    ReadProcessMemoryInternal(Tar_handle, ((BYTE *)buffer) + 0x1000, &result, 0x8, 0);
+                    ReadProcessMemoryInternal(Tar_handle, ((BYTE*)buffer) + 0x1000, &result, 0x8, 0);
                     CloseHandle(hThread);
                 }
             }
@@ -1592,12 +991,87 @@ __inject_proc:
     return 0;
 }
 
-// For choose suspend
+
+static uint64_t Hksr_ENmobile_get_Ptr(HANDLE Tar_handle, LPCWSTR GPath)
+{
+    uintptr_t GameAssembly_PEbuffer;
+    HMODULE il2cpp_base;
+    {
+        wstring path = GPath;
+        path += L"\\GameAssembly.dll";
+        il2cpp_base = RemoteDll_Inject(Tar_handle, path.c_str());
+        if (!il2cpp_base)
+        {
+            Show_Error_Msg(L"load GameAssembly.dll Failed !\n");
+            return 0;
+        }
+        GameAssembly_PEbuffer = (uintptr_t)VirtualAlloc_Internal(0, 0x1000, PAGE_READWRITE);
+        if (!GameAssembly_PEbuffer)
+            return 0;
+        if (!ReadProcessMemoryInternal(Tar_handle, il2cpp_base, (void*)GameAssembly_PEbuffer, 0x1000, 0))
+            return 0;
+        
+        int32_t* WinPEfileVA = (int32_t*)((uint64_t)GameAssembly_PEbuffer + 0x3C); //dos_header
+        PIMAGE_NT_HEADERS64 PEfptr = (PIMAGE_NT_HEADERS64)((int64_t)GameAssembly_PEbuffer + *WinPEfileVA); //get_winPE_VA
+        uint32_t imgsize = PEfptr->OptionalHeader.SizeOfImage;
+        LPVOID IMGbuffer = VirtualAlloc_Internal(0, imgsize, PAGE_READWRITE);
+        if (!IMGbuffer)
+            return 0;
+        if (!ReadProcessMemoryInternal(Tar_handle, il2cpp_base, IMGbuffer, imgsize, 0))
+            return 0;
+
+        VirtualFree_Internal((void*)GameAssembly_PEbuffer, 0, MEM_RELEASE);
+        GameAssembly_PEbuffer = (uintptr_t)IMGbuffer;
+    }
+    uintptr_t Ua_il2cpp_RVA = 0;
+    DWORD32 Ua_il2cpp_Vsize = 0;
+    uint64_t retvar = 0;
+    if (!Get_Section_info(GameAssembly_PEbuffer, "il2cpp", &Ua_il2cpp_Vsize, &Ua_il2cpp_RVA, GameAssembly_PEbuffer))
+    {
+        Show_Error_Msg(L"get Section info Error !\n");
+        goto __exit;
+    }
+    if (Ua_il2cpp_RVA && Ua_il2cpp_Vsize)
+    {
+        //80 B9 ?? ?? ?? ?? 00 74 46 C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3       //HKSR_2.4.0 - 2.5.0
+        //      75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3          //old-x-x-x--2.6.0
+        DWORD Device_type = Tar_Device;
+        DWORD64 tar_addr;
+        bool is_new_ver = 1;
+        DWORD64 address = 0;
+        if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3"))
+        {
+            tar_addr = address + 9;
+            is_new_ver = 0;
+        }
+        else if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "80 B9 ?? ?? ?? ?? 00 74 46 C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3"))
+        {
+            tar_addr = address + 11;
+        }
+        else
+        {
+            Show_Error_Msg(L"UI pattern outdate!");
+            goto __exit;
+        }
+        int64_t rip = tar_addr;
+        rip += *(int32_t*)rip;
+        rip += 8;
+        rip -= GameAssembly_PEbuffer;
+        retvar = ((uint64_t)il2cpp_base + rip);
+    }
+    
+__exit:
+    VirtualFree_Internal((void*)GameAssembly_PEbuffer, 0, MEM_RELEASE);
+    return retvar;
+
+}
+
+//For choose suspend
 static DWORD __stdcall Thread_display(LPVOID null)
 {
     while (1)
     {
-        Sleep(100);
+        NtSleep(100);
         if (Process_endstate)
             break;
         printf_s("\rFPS: %d - %s    %s", FpsValue, FpsValue < 30 ? "Low power state" : "Normal state   ", "  Press END key stop change  ");
@@ -1614,16 +1088,13 @@ static void FullScreen()
     Hand = GetStdHandle(STD_OUTPUT_HANDLE);
     GetConsoleScreenBufferInfo(Hand, &Info);
     SMALL_RECT rect = Info.srWindow;
-    COORD size = {rect.Right + 1, rect.Bottom + 1}; // 定义缓冲区大小，保持缓冲区大小和屏幕大小一致即可取消边框
+    COORD size = { rect.Right + 1 ,rect.Bottom + 1 };	//定义缓冲区大小，保持缓冲区大小和屏幕大小一致即可取消边框 
     SetConsoleScreenBufferSize(Hand, size);
 }
 
-int main(/*int argc, char** argvA*/ void)
+
+int main(/*int argc, char** argvA*/void)
 {
-    if (ElevateNow())
-    {
-        return 1;
-    }
     SetPriorityClass((HANDLE)-1, HIGH_PRIORITY_CLASS);
     setlocale(LC_CTYPE, "");
     FullScreen();
@@ -1633,46 +1104,35 @@ int main(/*int argc, char** argvA*/ void)
     {
         Show_Error_Msg(L"Get Console HWND Failed!");
     }
-
-    wprintf_s(L"FPS unlocker 2.8.4\n\nThis program is OpenSource in this link\n https://github.com/winTEuser/Genshin_StarRail_fps_unlocker \n这个程序开源,链接如上\n\nNTOSver: %u \nNTDLLver: %u\n", *(uint16_t *)((__readgsqword(0x60)) + 0x120), ParseOSBuildBumber());
+    
+    wprintf_s(L"FPS unlocker Debug\n\nThis program is OpenSource in this link\n https://github.com/winTEuser/Genshin_StarRail_fps_unlocker \n这个程序开源,链接如上\n\nNTOSver: %u \nNTDLLver: %u\n", *(uint16_t*)((__readgsqword(0x60)) + 0x120), ParseOSBuildBumber());
 
     if (NTSTATUS r = init_API())
     {
-        printf_s("\nInit Error: 0x%X", r);
-        Show_Error_Msg(L"InitAPI failed!");
         return r;
     }
 
-    Boot_arg barg{0};
+    Boot_arg barg{};
     if (Init_Game_boot_arg(&barg) == 0)
-        return 0;
+        return 0; 
 
     if (LoadConfig() == 0)
         return 0;
 
-    _G_shellcode_buffer = init_shellcode();
-    if (!_G_shellcode_buffer)
-    {
-        Show_Error_Msg(L"initcode failed!");
-        return 0;
-    }
-
-    wstring *ProcessPath = NewWstring(GamePath.size() + 1);
-    wstring *ProcessDir = NewWstring(GamePath.size() + 1);
-    wstring *procname = NewWstring(32);
-
+    wstring* ProcessPath = NewWstring(GamePath.size() + 1);
+    wstring* ProcessDir = NewWstring(GamePath.size() + 1);
+    wstring* procname = NewWstring(32);
     *ProcessPath = GamePath;
+    *ProcessDir = ProcessPath->substr(0, ProcessPath->find_last_of(L"\\"));
+    *procname = ProcessPath->substr(ProcessPath->find_last_of(L"\\") + 1);
+
     wprintf_s(L"\nGamePath: %s \n\n", GamePath.c_str());
-    if (isGenshin == 0)
+    if(isGenshin == 0)
     {
         wprintf_s(L"When V-sync is opened, you need open setting then quit to apply change in StarRail.\n当垂直同步开启时解锁帧率需要进设置界面再退出才可应用\n");
     }
 
-    *ProcessDir = ProcessPath->substr(0, ProcessPath->find_last_of(L"\\"));
-    *procname = ProcessPath->substr(ProcessPath->find_last_of(L"\\") + 1);
-
     {
-
     _wait_process_close:
         DWORD pid = GetPID(procname->c_str());
         if (pid)
@@ -1681,12 +1141,13 @@ int main(/*int argc, char** argvA*/ void)
             if (state == 1)
             {
                 HANDLE tempHandle = OpenProcess_Internal(PROCESS_TERMINATE | SYNCHRONIZE, pid);
-                TerminateProcess(tempHandle, 0);
+                TerminateProcess_Internal(tempHandle, 0);
                 WaitForSingleObject(tempHandle, 2000);
                 CloseHandle(tempHandle);
             }
             goto _wait_process_close;
         }
+        __nop();
     }
 
     if (isGenshin)
@@ -1700,8 +1161,7 @@ int main(/*int argc, char** argvA*/ void)
             Size = (Size << 32) | lSize;
             if (Size < 0x800000)
                 is_old_version = 1;
-            else
-                is_old_version = 0;
+            else is_old_version = 0;
             CloseHandle(file_Handle);
         }
         else
@@ -1709,16 +1169,11 @@ int main(/*int argc, char** argvA*/ void)
             Show_Error_Msg(L"OpenFile Failed!");
         }
     }
-
-    DWORD Hksr_ui_Rva = 0;
-    if ((isGenshin == 0) && Use_mobile_UI)
-    {
-        Hksr_ui_Rva = Hksr_ENmobile_get_Rva(ProcessDir->c_str());
-    }
+    
     size_t bootsize = sizeof(STARTUPINFOW) + sizeof(PROCESS_INFORMATION) + 0x20;
     LPVOID boot_info = malloc(bootsize);
-    STARTUPINFOW *si = (STARTUPINFOW *)((uint8_t *)boot_info + sizeof(PROCESS_INFORMATION) + 0x8);
-    PROCESS_INFORMATION *pi = (PROCESS_INFORMATION *)boot_info;
+    STARTUPINFOW* si = (STARTUPINFOW*)((uint8_t*)boot_info + sizeof(PROCESS_INFORMATION) + 0x8);
+    PROCESS_INFORMATION* pi = (PROCESS_INFORMATION*)boot_info;
     if (!boot_info)
     {
         Show_Error_Msg(L"Malloc failed!");
@@ -1726,14 +1181,19 @@ int main(/*int argc, char** argvA*/ void)
     }
     memset(boot_info, 0, bootsize);
 
-    if (!((CreateProcessW_pWin64) ~(DWORD64)CreateProcessW_p)(ProcessPath->c_str(), (barg.Game_Arg), NULL, NULL, FALSE, CREATE_SUSPENDED | GamePriorityClass, NULL, ProcessDir->c_str(), si, pi))
+    if (!((CreateProcessW_pWin64)~(DWORD64)CreateProcessW_p)(ProcessPath->c_str(), (barg.Game_Arg), NULL, NULL, FALSE, CREATE_SUSPENDED | GamePriorityClass, NULL, ProcessDir->c_str(), si, pi))
     {
         Show_Error_Msg(L"CreateProcess Fail!");
         return 0;
     }
     free(barg.Game_Arg);
 
-    // 加载和获取模块信息
+    inject_arg injectarg = { 0 };
+    if ((isGenshin == 0) && Use_mobile_UI)
+    {
+        injectarg.arg2 = Hksr_ENmobile_get_Ptr(pi->hProcess, ProcessDir->c_str());
+    }
+    //加载和获取模块信息
     LPVOID _mbase_PE_buffer = 0;
     uintptr_t Text_Remote_RVA = 0;
     uintptr_t Unityplayer_baseAddr = 0;
@@ -1743,7 +1203,7 @@ int main(/*int argc, char** argvA*/ void)
         if (_mbase_PE_buffer == 0)
         {
             Show_Error_Msg(L"VirtualAlloc Failed! (PE_buffer)");
-            TerminateProcess(pi->hProcess, 0);
+            TerminateProcess_Internal(pi->hProcess, 0);
             CloseHandle(pi->hProcess);
             return 0;
         }
@@ -1761,16 +1221,16 @@ int main(/*int argc, char** argvA*/ void)
 
         if (Unityplayer_baseAddr)
         {
-            if (ReadProcessMemoryInternal(pi->hProcess, (void *)Unityplayer_baseAddr, _mbase_PE_buffer, 0x1000, 0))
+            if (ReadProcessMemoryInternal(pi->hProcess, (void*)Unityplayer_baseAddr, _mbase_PE_buffer, 0x1000, 0))
             {
                 if (Get_Section_info((uintptr_t)_mbase_PE_buffer, ".text", &Text_Vsize, &Text_Remote_RVA, Unityplayer_baseAddr))
                     goto __Get_target_sec;
             }
         }
-
+        
         Show_Error_Msg(L"Get Target Section Fail! (text)");
         VirtualFree_Internal(_mbase_PE_buffer, 0, MEM_RELEASE);
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
@@ -1781,62 +1241,61 @@ __Get_target_sec:
     if (Copy_Text_VA == NULL)
     {
         Show_Error_Msg(L"Malloc Failed! (text)");
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
     // 把整个模块读出来
-    if (ReadProcessMemoryInternal(pi->hProcess, (void *)Text_Remote_RVA, Copy_Text_VA, Text_Vsize, 0) == 0)
+    if (ReadProcessMemoryInternal(pi->hProcess, (void*)Text_Remote_RVA, Copy_Text_VA, Text_Vsize, 0) == 0)
     {
         Show_Error_Msg(L"Readmem Fail ! (text)");
         VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
-
-    // starrail
-    // 66 0F 6E 05 ?? ?? ?? ?? F2 0F 10 3D ?? ?? ?? ?? 0F 5B C0
+   
+    //starrail 
+    //66 0F 6E 05 ?? ?? ?? ?? F2 0F 10 3D ?? ?? ?? ?? 0F 5B C0
+    // 
+    //7F 0F 8B 05 ?? ?? ?? ?? 66 0F 6E C8 
+    // 
+    //7F 0E E8 ? ? ? ? 66 0F 6E C8 0F 5B C9
     //
-    // 7F 0F 8B 05 ?? ?? ?? ?? 66 0F 6E C8
-    //
-    // 7F 0E E8 ? ? ? ? 66 0F 6E C8 0F 5B C9
-    //
-    // 7E 0C E8 ?? ?? ?? ?? 66 0F 6E C8 0F 5B C9
-    //
-    //  计算相对地址 (FPS)
-
+    //7E 0C E8 ?? ?? ?? ?? 66 0F 6E C8 0F 5B C9 
+    // 8B 0D ?? ?? ?? ?? 66 0F 6E C9 0F 5B C9 
+    // 计算相对地址 (FPS)
+    
     uintptr_t pfps = 0;
     uintptr_t address = 0;
     if (isGenshin)
     {
-        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "7E 0C E8 ?? ?? ?? ?? 66 0F 6E C8 0F 5B C9");
+        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "8B 0D ?? ?? ?? ?? 66 0F 6E C9 0F 5B C9");//5.5
         if (address)
         {
             int64_t rip = address;
-            rip += 3;
-            rip += *(int32_t *)(rip) + 6;
-            rip += *(int32_t *)(rip) + 4;
+            rip += 2;
+            rip += *(int32_t*)(rip)+4;
             pfps = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
             goto __genshin_il;
         }
-        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "8B DF E8 ?? ?? ?? ?? 0F 57 C0 0F 29 74 24 30 66 0F 6E C8 0F 5B C9");
+        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "7E 0C E8 ?? ?? ?? ?? 66 0F 6E C8 0F 5B C9");//5.4
         if (address)
         {
             int64_t rip = address;
             rip += 3;
-            rip += *(int32_t *)(rip) + 6;
-            rip += *(int32_t *)(rip) + 4;
+            rip += *(int32_t*)(rip) + 6;
+            rip += *(int32_t*)(rip) + 4;
             pfps = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
             goto __genshin_il;
         }
-        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "7F 0E E8 ?? ?? ?? ?? 66 0F 6E C8"); // ver 3.7 - 5.3
+        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "7F 0E E8 ?? ?? ?? ?? 66 0F 6E C8"); // ver 3.7 - 5.3 
         if (address)
         {
             int64_t rip = address;
             rip += 3;
-            rip += *(int32_t *)(rip) + 6;
-            rip += *(int32_t *)(rip) + 4;
+            rip += *(int32_t*)(rip) + 6;
+            rip += *(int32_t*)(rip) + 4;
             pfps = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
             goto __genshin_il;
         }
@@ -1845,37 +1304,37 @@ __Get_target_sec:
         {
             int64_t rip = address;
             rip += 4;
-            rip += *(int32_t *)(rip) + 4;
+            rip += *(int32_t*)(rip) + 4;
             pfps = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
             goto __genshin_il;
         }
         Show_Error_Msg(L"Genshin Pattern Outdated!\nPlase wait new update in github.\n\n");
         VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
     else
-    {
+    {//HKSR_pattern
         isHook = 0;
-        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "66 0F 6E 05 ?? ?? ?? ?? F2 0F 10 3D ?? ?? ?? ?? 0F 5B C0"); // ver 1.0 - last
+        address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "66 0F 6E 05 ?? ?? ?? ?? F2 0F 10 3D ?? ?? ?? ?? 0F 5B C0"); //ver 1.0 - last
         if (address)
         {
             int64_t rip = address;
             rip += 4;
-            rip += *(int32_t *)(rip) + 4;
+            rip += *(int32_t*)(rip) + 4;
             pfps = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-
+            
             if (address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "CC 89 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC CC CC CC CC"))
             {
                 int64_t rip = address;
                 rip += 3;
-                rip += *(int32_t *)(rip) + 4;
+                rip += *(int32_t*)(rip)+4;
                 if ((rip - (uintptr_t)Copy_Text_VA + (uintptr_t)Text_Remote_RVA) == pfps)
                 {
                     rip = address + 1;
                     DWORD64 Patch0_addr_hook = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-                    uint8_t patch = 0x8B; // mov dword ptr ds:[?????????], ecx   -->  mov ecx, dword ptr ds:[?????????]
+                    uint8_t patch = 0x8B;      //mov dword ptr ds:[?????????], ecx   -->  mov ecx, dword ptr ds:[?????????]
                     if (WriteProcessMemoryInternal(pi->hProcess, (LPVOID)Patch0_addr_hook, (LPVOID)&patch, 0x1, 0) == 0)
                     {
                         Show_Error_Msg(L"Patch Fail! ");
@@ -1888,73 +1347,110 @@ __Get_target_sec:
         }
         Show_Error_Msg(L"StarRail Pattern Outdated!\nPlase wait new update in github.\n\n");
         VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
     //-------------------------------------------------------------------------------------------------------------------------------------------------//
 
 __genshin_il:
-{
-    uintptr_t UA_baseAddr = Unityplayer_baseAddr;
-    if (is_old_version)
+    if(Use_mobile_UI || isHook)
     {
-        wstring il2cppPath = *ProcessDir;
-        il2cppPath += L"\\YuanShen_Data\\Native\\UserAssembly.dll";
-        UA_baseAddr = (uintptr_t)RemoteDll_Inject(pi->hProcess, il2cppPath.c_str());
-        if (UA_baseAddr)
+        if (Use_mobile_UI)
         {
-            if (!ReadProcessMemoryInternal(pi->hProcess, (void *)UA_baseAddr, _mbase_PE_buffer, 0x1000, 0))
+            //E8 ?? ?? ?? ?? 48 8B 7D 40 89 87 ?? ?? ?? ?? E8 ?? ?? ?? ?? 4C 8B C0  platform_flag
+            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "E8 ?? ?? ?? ?? 48 8B 7D 40 89 87 ?? ?? ?? ?? E8 ?? ?? ?? ?? 4C 8B C0");
+            if (address)
             {
-                goto __procfail;
+                int64_t rip = address;
+                rip += 1;
+                rip += *(int32_t*)(rip) + 4 + 1;// +1 jmp va
+                rip += *(int32_t*)(rip) + 4 + 1;// +1 mov eax va
+                injectarg.arg3 = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
+            }
+            else
+            {
+                Use_mobile_UI = 0;
             }
         }
-    }
-    if (Get_Section_info((uintptr_t)_mbase_PE_buffer, "il2cpp", &Text_Vsize, &Text_Remote_RVA, UA_baseAddr))
-    {
-        goto __Get_sec_ok;
-    }
-    Show_Error_Msg(L"Get Section Fail! (il2cpp_GI)");
-__procfail:
-    isHook = 0;
-    goto __Continue;
-
-__Get_sec_ok:
-    VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
-    Copy_Text_VA = VirtualAlloc_Internal(0, Text_Vsize, PAGE_READWRITE);
-    if (Copy_Text_VA == NULL)
-    {
-        Show_Error_Msg(L"Malloc Failed! (il2cpp_GI)");
-        goto __procfail;
-    }
-    if (!ReadProcessMemoryInternal(pi->hProcess, (void *)Text_Remote_RVA, Copy_Text_VA, Text_Vsize, 0))
-    {
-        Show_Error_Msg(L"Readmem Fail ! (il2cpp_GI)");
-        goto __procfail;
-    }
-    address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "48 89 F1 E8 ?? ?? ?? ?? 8B 3D ?? ?? ?? ?? 48 8B 0D");
-    if (address)
-    {
-        int64_t rip = address;
-        rip += 10;
-        rip += *(int32_t *)rip;
-        rip += 4;
-        address = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
+        uintptr_t UA_baseAddr = Unityplayer_baseAddr;
+        if (is_old_version)
+        {
+            wstring il2cppPath = *ProcessDir;
+            il2cppPath += L"\\YuanShen_Data\\Native\\UserAssembly.dll";
+            UA_baseAddr = (uintptr_t)RemoteDll_Inject(pi->hProcess, il2cppPath.c_str());
+            if (UA_baseAddr)
+            {
+                if (!ReadProcessMemoryInternal(pi->hProcess, (void*)UA_baseAddr, _mbase_PE_buffer, 0x1000, 0))
+                {
+                    goto __procfail;
+                }
+            }
+        }
+        if (Get_Section_info((uintptr_t)_mbase_PE_buffer, "il2cpp", &Text_Vsize, &Text_Remote_RVA, UA_baseAddr))
+        {
+            goto __Get_sec_ok;
+        }
+        Show_Error_Msg(L"Get Section Fail! (il2cpp_GI)");
+    __procfail:
+        isHook = 0;
         goto __Continue;
+
+    __Get_sec_ok:
+        VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
+        Copy_Text_VA = VirtualAlloc_Internal(0, Text_Vsize, PAGE_READWRITE);
+        if (Copy_Text_VA == NULL)
+        {
+            Show_Error_Msg(L"Malloc Failed! (il2cpp_GI)");
+            goto __procfail;
+        }
+        if (!ReadProcessMemoryInternal(pi->hProcess, (void*)Text_Remote_RVA, Copy_Text_VA, Text_Vsize, 0))
+        {
+            Show_Error_Msg(L"Readmem Fail ! (il2cpp_GI)");
+            goto __procfail;
+        }
+        if (Use_mobile_UI)
+        {
+            //E8 ?? ?? ?? ?? EB 0D 48 89 F1 BA 02 00 00 00 E8 ?? ?? ?? ?? 48 8B 0D //hookFunc
+            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "E8 ?? ?? ?? ?? EB 0D 48 89 F1 BA 02 00 00 00 E8 ?? ?? ?? ?? 48 8B 0D");
+            if (address)
+            {
+                int64_t rip = address;
+                rip += 0x1;
+                rip += *(int32_t*)(rip) + 4;
+                injectarg.arg4 = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
+                injectarg.arg2 = Tar_Device;
+            }
+            else
+            {
+                Use_mobile_UI = 0;
+            }
+        }
+        if (isHook)
+        {
+            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "48 89 F1 E8 ?? ?? ?? ?? 8B 3D ?? ?? ?? ?? 48 8B 0D");
+            if (address)
+            {
+                int64_t rip = address;
+                rip += 10;
+                rip += *(int32_t*)rip;
+                rip += 4;
+                injectarg.arg1 = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
+                goto __Continue;
+            }
+        }
+        isHook = 0;
     }
-    isHook = 0;
-}
 
 __Continue:
-    uintptr_t Patch_buffer = inject_patch(pi->hProcess, address, pfps, Hksr_ui_Rva);
+    uintptr_t Patch_buffer = inject_patch(pi->hProcess, pfps, &injectarg);
     if (!Patch_buffer)
     {
         Show_Error_Msg(L"Inject Fail !\n");
-        TerminateProcess(pi->hProcess, 0);
+        TerminateProcess_Internal(pi->hProcess, 0);
         CloseHandle(pi->hProcess);
         return 0;
     }
-    _G_shellcode_buffer = (BYTE *)Patch_buffer;
 
     if (barg.Path_Lib)
     {
@@ -1966,32 +1462,32 @@ __Continue:
         }
         free(barg.Path_Lib);
     }
-
+    
     DelWstring(&ProcessPath);
     DelWstring(&ProcessDir);
     DelWstring(&procname);
 
     VirtualFree_Internal(_mbase_PE_buffer, 0, MEM_RELEASE);
     VirtualFree_Internal(Copy_Text_VA, 0, MEM_RELEASE);
-
+    
     ResumeThread(pi->hThread);
     CloseHandle(pi->hThread);
-
-    SetPriorityClass((HANDLE)-1, NORMAL_PRIORITY_CLASS);
+    
+    SetPriorityClass((HANDLE) -1, NORMAL_PRIORITY_CLASS);
 
     wprintf_s(L"PID: %d\n \nDone! \n \nUse Right Ctrl Key with ↑↓←→ key to change fps limted\n使用键盘上的右Ctrl键和方向键调节帧率限制\n\n\n  Rctrl + ↑ : +20\n  Rctrl + ↓ : -20\n  Rctrl + ← : -2\n  Rctrl + → : +2\n\n", pi->dwProcessId);
-
+    
     // 创建printf线程
-    HANDLE hdisplay = CreateThread_Internal((HANDLE)-1, 0, Thread_display, 0);
+    HANDLE hdisplay = CreateRemoteThreadEx_Internal((HANDLE) - 1, 0, Thread_display, 0);
     if (!hdisplay)
         Show_Error_Msg(L"Create Thread <Thread_display> Error! ");
 
     DWORD dwExitCode = STILL_ACTIVE;
     uint32_t fps = FpsValue;
     uint32_t cycle_counter = 0;
-    while (1) // handle key input
+    while (1)   // handle key input
     {
-        Sleep(50);
+        NtSleep(50);
         cycle_counter++;
         GetExitCodeProcess(pi->hProcess, &dwExitCode);
         if (dwExitCode != STILL_ACTIVE)
@@ -2005,7 +1501,7 @@ __Continue:
             FpsValue = fps;
             cycle_counter = 0;
         }
-        FpsValue = fps; // Sync_with_ingame_thread
+        FpsValue = fps;   //Sync_with_ingame_thread
         if ((GetForegroundWindow() != _console_HWND) && (isAntimiss == 1))
         {
             continue;
@@ -2036,6 +1532,6 @@ __Continue:
     Process_endstate++;
     WaitForSingleObject(hdisplay, INFINITE);
     CloseHandle(hdisplay);
-
+    
     return 1;
 }
