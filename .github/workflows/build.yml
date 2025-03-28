@@ -11,8 +11,18 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Compile using MSVC
-        run: cl /EHsc /Fe:myprogram.exe main.cpp
+    - name: Set up MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Compile with MSVC
+      shell: cmd
+      run: cl /EHsc /Fe:myprogram.exe main.cpp
+
+    - name: Upload myprogram.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: myprogram-exe
+        path: myprogram.exe
