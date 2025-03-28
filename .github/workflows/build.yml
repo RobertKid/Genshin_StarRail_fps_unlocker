@@ -19,7 +19,7 @@ jobs:
 
       - name: Compile with MSVC
         shell: cmd
-        run: cl /EHsc /Fe:unlocker.exe vscode\main.cpp
+        run: cl /EHsc /Fe:unlocker.exe src\main.cpp
         working-directory: ${{ github.workspace }}
 
       - name: List files after linking
